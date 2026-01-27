@@ -1,0 +1,35 @@
+[project]
+name = "Synthetic Data Generation"
+output_dir = "output"
+
+[[iterations]]
+name = "datagen"
+
+[iterations.datagen]
+relations = [
+  { name = "uniform", num_rows = 150_000_000, attributes = [
+
+    { name = "employeeID", distribution = { type = "sequential" }, null_ratio = 0.0, dtype = "int64" },
+    { name = "age", distribution = { type = "uniform" }, low = 22, high = 65, dtype = "int64" },
+    { name = "salary", distribution = {type = "uniform"}, low = 80_000, high=250_000, dtype="int64"},
+    { name = "yearsOfExperience", distribution = {type = "uniform"}, low = 1, high = 30, dtype="int64"},
+    { name = "firstYearAtCompany", distribution = {type = "uniform"}, low = 1990, high = 2025, dtype="int64"},
+    { name = "phoneNumber", distribution = {type = "sequential"}, low = 1000000000, high = 9999999999, dtype="int64"}
+  ] }, { name = "gaussian", num_rows = 150_000_000, attributes = [
+
+    { name = "employeeID", distribution = { type = "sequential" }, null_ratio = 0.0, dtype = "int64" },
+    { name = "age", distribution = { type = "gaussian", mean = 35, std = 5 }, low = 22, high = 65, dtype = "int64" },
+    { name = "salary", distribution = {type = "gaussian", mean = 120000, std = 10000}, low = 80_000, high=250_000, dtype="int64"},
+    { name = "yearsOfExperience", distribution = {type = "gaussian", mean = 10, std = 2}, low = 1, high = 30, dtype="int64"},
+    { name = "firstYearAtCompany", distribution = {type = "gaussian", mean = 2010, std = 5}, low = 1990, high = 2025, dtype="int64"},
+    { name = "phoneNumber", distribution = {type = "sequential"}, low = 1000000000, high = 9999999999, dtype="int64"}
+  ] },{ name = "zipf", num_rows = 150_000_000, attributes = [
+
+    { name = "employeeID", distribution = { type = "sequential" }, null_ratio = 0.0, dtype = "int64" },
+    { name = "age", distribution = { type = "zipf", skew = 1.2 }, low = 22, high = 65, dtype = "int64" },
+    { name = "salary", distribution = {type = "zipf", skew = 1.2}, low = 80_000, high=250_000, dtype="int64"},
+    { name = "yearsOfExperience", distribution = {type = "zipf", skew = 1.2}, low = 1, high = 30, dtype="int64"},
+    { name = "firstYearAtCompany", distribution = {type = "zipf", skew = 1.2}, low = 1990, high = 2025, dtype="int64"},
+    { name = "phoneNumber", distribution = {type = "sequential"}, low = 1000000000, high = 9999999999, dtype="int64"}
+  ] },
+]

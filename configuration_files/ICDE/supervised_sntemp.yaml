@@ -1,0 +1,44 @@
+database: archive/sntemp_inputs_outputs_lordville_with_index.csv
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: 'linear_regression'
+automate_feature_selection: false
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+planned_clusters: 2
+
+runtime_parameters:
+    choice_1:
+        predictor: seg_humid
+        clustering: supervised
+        cluster_alg: KM
+        accuracy: .5
+        outlier_detection: false
+        accuracy_tuning: true
+        preprocess_data: false
+        postprocess_data: false
+    choice_2:
+        predictor: seg_humid
+        clustering: supervised
+        cluster_alg: KM
+        accuracy: 1
+        accuracy_tuning: true
+        preprocess_data: false
+        postprocess_data: false
+    choice_3:
+        predictor: seg_humid
+        clustering: supervised
+        cluster_alg: KM
+        accuracy: 2.5
+        accuracy_tuning: true
+        preprocess_data: false
+        postprocess_data: false
+    choice_4:
+        predictor: seg_humid
+        clustering: supervised
+        cluster_alg: KM
+        accuracy: 5
+        accuracy_tuning: true
+        preprocess_data: false
+        postprocess_data: false

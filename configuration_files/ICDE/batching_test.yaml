@@ -1,0 +1,53 @@
+database: "archive/measurements_airquality.csv"
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: "linear_regression"
+automate_feature_selection: false
+use_one_predictor: false
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+planned_clusters: 2
+approximate_sampled_rows: 10000000
+sampling_seed: 17
+sample_max_attempts: 5
+
+runtime_parameters:
+  choice_0:
+    predictor: microcontroller_id
+    clustering: unsupervised
+    cluster_alg: Minhal
+    accuracy: 1
+    split_size: 4
+    preprocess_data: false
+    postprocess_data: true
+    batch_size: "256MB"
+    batch_method: array_index
+
+# Specifies which features are used to predictors for other features
+# If automate_feature_selection is set to true, this section will be ignored
+predicted_by:
+  "co":
+    - "microcontroller_id"
+  "nox":
+    - "microcontroller_id"
+  "no2":
+    - "microcontroller_id"
+  "o3":
+    - "microcontroller_id"
+  "pm2_5":
+    - "microcontroller_id"
+  "pm10":
+    - "microcontroller_id"
+  "so2":
+    - "microcontroller_id"
+  "latitude":
+    - "microcontroller_id"
+  "longitude":
+    - "microcontroller_id"
+  "c6h6":
+    - "microcontroller_id"
+  "altitude":
+    - "microcontroller_id"
+  "no":
+    - "microcontroller_id"

@@ -1,0 +1,50 @@
+database: "archive/cardio_train.csv"
+result_location: "results/"
+machine_learning_model: "none"
+expand_data_multiplier: 0
+text_limit_training: false
+runtime_parameters:
+  lzma:
+    clustering: none
+    compression_parameters:
+      method: "lzma"
+      compressed_columns:
+        - "age"
+        - "height"
+        - "weight"
+        - "ap_hi"
+        - "ap_lo"
+      encoding: "utf-8"
+  gzip:
+    clustering: none
+    compression_parameters:
+      method: "gzip"
+      compressed_columns:
+        - "age"
+        - "height"
+        - "weight"
+        - "ap_hi"
+        - "ap_lo"
+      encoding: "utf-8"
+  bz2:
+    clustering: none
+    compression_parameters:
+      method: "bzip2"
+      compressed_columns:
+        - "age"
+        - "height"
+        - "weight"
+        - "ap_hi"
+        - "ap_lo"
+      encoding: "utf-8"
+  zstd:
+    clustering: none
+    compression_parameters:
+      method: "zstd"
+      compressed_columns:
+        - "age"
+        - "height"
+        - "weight"
+        - "ap_hi"
+        - "ap_lo"
+      encoding: "utf-8"

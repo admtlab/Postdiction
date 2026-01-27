@@ -1,0 +1,300 @@
+datasets:
+  cardio_train.csv:
+    columns:
+      - name: Index
+        type: index
+        size: 64
+      - name: age
+        type: continuous
+        size: 64
+      - name: gender
+        type: categorical
+        size: 1
+      - name: height
+        type: continuous
+        size: 64
+      - name: weight
+        type: continuous
+        size: 64
+      - name: ap_hi
+        type: continuous
+        size: 64
+      - name: ap_lo
+        type: continuous
+        size: 64
+      - name: cholesterol
+        type: categorical
+        size: 2
+      - name: gluc
+        type: categorical
+        size: 1
+      - name: smoke
+        type: categorical
+        size: 1
+      - name: alco
+        type: categorical
+        size: 1
+      - name: active
+        type: categorical
+        size: 1
+      - name: cardio
+        type: categorical
+        size: 1
+  sntemp_inputs_outputs_lordville.csv:
+    columns:
+      - name: Index
+        type: index
+        size: 64
+      - name: seg_id_nat
+        type: index
+        size: 64
+      - name: model_idx
+        type: index
+        size: 64
+      - name: date
+        type: date
+        size: 64
+      - name: seg_ccov
+        type: continuous
+        size: 64
+      - name: seg_humid
+        type: continuous
+        size: 64
+      - name: seg_outflow
+        type: continuous
+        size: 64
+      - name: seg_rain
+        type: continuous
+        size: 64
+      - name: seg_shade
+        type: continuous
+        size: 64
+      - name: seg_tave_air
+        type: continuous
+        size: 64
+      - name: seg_tave_gw
+        type: continuous
+        size: 64
+      - name: seg_tave_sroff
+        type: continuous
+        size: 64
+      - name: seg_tave_ss
+        type: continuous
+        size: 64
+      - name: seg_tave_upstream
+        type: continuous
+        size: 64
+      - name: seg_tave_water
+        type: continuous
+        size: 64
+      - name: seg_upstream_inflow
+        type: continuous
+        size: 64
+      - name: seg_width
+        type: continuous
+        size: 64
+      - name: seginc_gwflow
+        type: cntinuous
+        size: 64
+      - name: seginc_potet
+        type: continuous
+        size: 64
+      - name: seginc_sroff
+        type: continuous
+        size: 64
+      - name: seginc_ssflow
+        type: continuous
+        size: 64
+      - name: seginc_swrad
+        type: continuous
+        size: 64
+      - name: seg_length
+        type: continuous
+        size: 64
+      - name: seg_slope
+        type: continuous
+        size: 64
+      - name: seg_elev
+        type: continuous
+        size: 64
+  sntemp_inputs_outputs_lordville_with_index.csv:
+    columns:
+      - name: Index
+        type: index
+        size: 64
+      - name: seg_id_nat
+        type: index
+        size: 64
+      - name: model_idx
+        type: index
+        size: 64
+      - name: date
+        type: date
+        size: 64
+      - name: seg_ccov
+        type: continuous
+        size: 64
+      - name: seg_humid
+        type: continuous
+        size: 64
+      - name: seg_outflow
+        type: continuous
+        size: 64
+      - name: seg_rain
+        type: continuous
+        size: 64
+      - name: seg_shade
+        type: continuous
+        size: 64
+      - name: seg_tave_air
+        type: continuous
+        size: 64
+      - name: seg_tave_gw
+        type: continuous
+        size: 64
+      - name: seg_tave_sroff
+        type: continuous
+        size: 64
+      - name: seg_tave_ss
+        type: continuous
+        size: 64
+      - name: seg_tave_upstream
+        type: continuous
+        size: 64
+      - name: seg_tave_water
+        type: continuous
+        size: 64
+      - name: seg_upstream_inflow
+        type: continuous
+        size: 64
+      - name: seg_width
+        type: continuous
+        size: 64
+      - name: seginc_gwflow
+        type: cntinuous
+        size: 64
+      - name: seginc_potet
+        type: continuous
+        size: 64
+      - name: seginc_sroff
+        type: continuous
+        size: 64
+      - name: seginc_ssflow
+        type: continuous
+        size: 64
+      - name: seginc_swrad
+        type: continuous
+        size: 64
+      - name: seg_length
+        type: continuous
+        size: 64
+      - name: seg_slope
+        type: continuous
+        size: 64
+      - name: seg_elev
+        type: continuous
+        size: 64
+  measurements_airquality.csv:
+    columns:
+      - name: microcontroller_id
+        type: int
+        size: 64
+      - name: time_taken
+        type: timestamp
+        size: 64
+      - name: co
+        type: continuous
+        size: 64
+      - name: c6h6
+        type: continuous
+        size: 64
+      - name: no
+        type: continuous
+        size: 64
+      - name: nox
+        type: continuous
+        size: 64
+      - name: no2
+        type: continuous
+        size: 64
+      - name: 03
+        type: continuous
+        size: 64
+      - name: pm2_5
+        type: continuous
+        size: 64
+      - name: pm10
+        type: continuous
+        size: 64
+      - name: s02
+        type: continuous
+        size: 64
+      - name: latitude
+        type: continuous
+        size: 64
+      - name: longitude
+        type: continuous
+        size: 64
+      - name: altitude
+        type: continuous
+        size: 64
+  uniform.parquet:
+    columns:
+      - name: employeeID
+        type: int
+        size: 64
+      - name: age
+        type: int
+        size: 64
+      - name: salary
+        type: int
+        size: 64
+      - name: yearsOfExperience
+        type: int
+        size: 64
+      - name: firstYearAtCompany
+        type: int
+        size: 64
+      - name: phoneNumber
+        type: int
+        size: 64
+  gaussian.parquet:
+    columns:
+      - name: employeeID
+        type: int
+        size: 64
+      - name: age
+        type: int
+        size: 64
+      - name: salary
+        type: int
+        size: 64
+      - name: yearsOfExperience
+        type: int
+        size: 64
+      - name: firstYearAtCompany
+        type: int
+        size: 64
+      - name: phoneNumber
+        type: int
+        size: 64
+  zipf.parquet:
+    columns:
+      - name: employeeID
+        type: int
+        size: 64
+      - name: age
+        type: int
+        size: 64
+      - name: salary
+        type: int
+        size: 64
+      - name: yearsOfExperience
+        type: int
+        size: 64
+      - name: firstYearAtCompany
+        type: int
+        size: 64
+      - name: phoneNumber
+        type: int
+        size: 64

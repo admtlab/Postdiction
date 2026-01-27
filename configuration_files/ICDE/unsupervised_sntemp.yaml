@@ -1,0 +1,47 @@
+database: archive/sntemp_inputs_outputs_lordville_with_index.csv
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: 'linear_regression'
+automate_feature_selection: false
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+use_one_predictor: true
+planned_clusters: 2
+approximate_sampled_rows: 10000000
+sampling_seed: 17
+sample_max_attempts: 5
+
+runtime_parameters:
+    choice_1:
+        predictor: seg_humid
+        clustering: unsupervised
+        cluster_alg: Minhal
+        accuracy: .5
+        split_size: 4
+        preprocess_data: false
+        postprocess_data: true
+    choice_2:
+        predictor: seg_humid
+        clustering: unsupervised
+        cluster_alg: Minhal
+        accuracy: 1
+        split_size: 4
+        preprocess_data: false
+        postprocess_data: true
+    choice_3:
+        predictor: seg_humid
+        clustering: unsupervised
+        cluster_alg: Minhal
+        accuracy: 2.5
+        split_size: 4
+        preprocess_data: false
+        postprocess_data: true
+    choice_4:
+        predictor: seg_humid
+        clustering: unsupervised
+        cluster_alg: Minhal
+        accuracy: 5
+        split_size: 4
+        preprocess_data: false
+        postprocess_data: true
