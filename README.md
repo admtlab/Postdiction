@@ -10,15 +10,7 @@ For the AFD detection using the Pyro algorithm, the `Pyro-distro-1.0-SNAPSHOT-di
 
 ### Environment
 
-All of the experiments were conducted within a WSL2 environment (Ubuntu Version 2404.1.68.1 published by Canonical Group Limited) from Windows 11 and the WSL2 environment was configured to have a memory limit of 16 GB (50 GB for batch tuning) by adding the below parameters to the WSL2 config:
-
-```
-# Settings apply across all Linux distros running on WSL 2
-[wsl2]
-
-# Limits VM memory to use no more than 16 GB, this can be set as whole numbers using GB or MB
-memory=16GB
-```
+All of the experiments were conducted on physical hardware using a Thinkpad P14S Gen 5 equipped with an Intel Ultra 7 155H CPU with 22 logical processors with 64 GB of RAM. Scalability experiments were conducted on a Thinkpad T470 equipped with an Intel Core i5-7300U CPU with 4 logical processors and 16 GB of RAM.
 
 ## Citations
 
