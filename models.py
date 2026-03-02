@@ -136,7 +136,6 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
         abs_cosine_similarity = list_of_cosine_similarities(y, list(y_pred))
         stripped_table["abs_cosine_similarity"] = abs_cosine_similarity
     elif metric == "jaccard":
-        # TODO: Implement Jaccard Similarity accuracy metric
         raise Exception("Jaccard Similarity accuracy metric currently not implemented")
     else:
         abs_percentage_error = list_of_percent_differences(y, list(y_pred))
@@ -146,7 +145,6 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
         inliers_table = stripped_table[stripped_table["abs_cosine_similarity"] >= percent_acceptable]
         outliers_table = stripped_table[stripped_table["abs_cosine_similarity"] < percent_acceptable]
     elif "abs_jaccard_similarity" in stripped_table:
-        # TODO: Implement Jaccard Similarity accuracy metric
         pass
     else:
         # Filter rows to get inliers and outliers table

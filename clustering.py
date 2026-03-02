@@ -87,7 +87,6 @@ def distribution(data: pd.DataFrame, num_clusters: int, x_label: str, y_label: s
     return clusters
 
 
-# Db Scan clustering TODO NOT WORKING - Not using x and y variable? Also DB scan is inefficient and works
 # Better for outlier detection, not clustering
 def db_scan(data, input, x_label, y_label):
     nbrs = NearestNeighbors(n_neighbors=5).fit(data)

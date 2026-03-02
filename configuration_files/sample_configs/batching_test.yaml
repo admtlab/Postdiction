@@ -16,7 +16,7 @@ sample_max_attempts: 5
 num_processes: 22
 index_column_name: "Index"
 memory_logging: false
-max_unsupervised_depth: 1000
+# max_unsupervised_depth: 1000
 excluded_attributes:
   - "time_taken"
   - "altitude"

@@ -279,7 +279,6 @@ def get_recovered_accuracy(y_true: list, y_pred: list, threshold: float, metric=
 
         return accuracy
     elif metric == "jaccard":
-        # TODO: Implement Jaccard Similarity metric
         pass
     else:
         percent_diff = list_of_percent_differences(y_true, y_pred)
