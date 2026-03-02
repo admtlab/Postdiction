@@ -2,8 +2,10 @@ import pandas as pd
 
 from models import Cluster
 from helper import size
+from config import config_get
 import math
 
+column_index_variable = config_get('index_column_name')
 
 def values_with_min_freq(data: pd.DataFrame, column_name: str, minimum_frequency: int) -> dict[float, int]:
     """
@@ -41,41 +43,41 @@ def create_clusters_for_frequent_items(data: pd.DataFrame, column_name: str, min
     filter_counts = values_with_min_freq(data, column_name, minimum_frequency)
     clusters = []
     for key, value in filter_counts.items():
-        inliers = data[data[column_name] == key]['Index'].tolist()
+        inliers = data[data[column_name] == key][column_index_variable].tolist()
         original_value_list = [key] * value
-        current_cluster = Cluster(None, inliers, original_value_list, original_value_list, key)
+        current_cluster = Cluster(None, inliers, original_value_list, original_value_list, key, cluster_index=(len(clusters)))
         clusters.append(current_cluster)
 
     # Collect rows not put into any cluster
     clustered_indices_set = set(index for cluster in clusters for index in cluster.inliers)
-    unclustered_indices = [index for index in data['Index'] if index not in clustered_indices_set]
-    unclustered_data = data[data['Index'].isin(unclustered_indices)]
+    unclustered_indices = [index for index in data[column_index_variable] if index not in clustered_indices_set]
+    unclustered_data = data[data[column_index_variable].isin(unclustered_indices)]
 
     return clusters, unclustered_data
 
 
-def free_clusters_to_nearest_power_of_2(clusters: list[Cluster]) -> tuple[list[Cluster], list[float]]:
+def free_clusters_to_nearest_power_of_2(clusters: list[Cluster]) -> tuple[list[Cluster], int]:
     # Edge Case: If no clusters were detected, this should return the empty list and avoid rounding
     if len(clusters) <= 1:
-        return clusters, []
+        return clusters, 0
 
     sorted_clusters = sorted(clusters.copy())
     nearest_power_of_2 = 2 ** (math.floor(math.log2(len(clusters))))
-    new_outliers = []
+    new_outliers = 0
 
     for cluster in sorted_clusters:
         # Check to see if we are at the nearest power of 2
         if len(sorted_clusters) == nearest_power_of_2 - 1:
             break
 
-        new_outliers.extend(cluster.inliers)
+        new_outliers += cluster.size
         sorted_clusters.remove(cluster)
 
     return sorted_clusters, new_outliers
 
 
 def free_clusters_to_best_compression(clusters: list[Cluster], num_outliers: int,
-                                      datatype_of_predicted_attribute: str, data_length: int, result_location) -> tuple[
+                                      datatype_of_predicted_attribute: str, data_length: int, result_location, y_label: str) -> tuple[
     list[Cluster], int]:
     prev_clusters = clusters.copy()
     prev_outliers = num_outliers
@@ -86,15 +88,12 @@ def free_clusters_to_best_compression(clusters: list[Cluster], num_outliers: int
 
     while (True):
         curr_clusters, curr_outliers = free_clusters_to_nearest_power_of_2(prev_clusters)
-        curr_num_outliers = len(curr_outliers) + prev_outliers
-        outlier_output = list(map(lambda cur_outlier: f'{cur_outlier}\n', curr_outliers))
-        with open(result_location, 'a') as outliers_file:
-            outliers_file.writelines(outlier_output)
+        curr_num_outliers = curr_outliers + prev_outliers
 
-        prev_compressed_size, original_size, ratio = size(len(prev_clusters), prev_outliers,
-                                                          datatype_of_predicted_attribute, data_length)
-        curr_compressed_size, original_size, ratio = size(len(curr_clusters), curr_num_outliers,
-                                                          datatype_of_predicted_attribute, data_length)
+        prev_compressed_size, original_size, ratio, _, _, _, _ = size(len(prev_clusters), prev_outliers,
+                                                          datatype_of_predicted_attribute, data_length, y_label)
+        curr_compressed_size, original_size, ratio, _, _, _, _ = size(len(curr_clusters), curr_num_outliers,
+                                                          datatype_of_predicted_attribute, data_length, y_label)
 
         if curr_compressed_size > prev_compressed_size or len(curr_clusters) <= 1:
             # Reducing to this number of clusters adds too many outliers to be worth it

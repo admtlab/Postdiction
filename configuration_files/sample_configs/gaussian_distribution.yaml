@@ -1,4 +1,4 @@
-database: "archive/djp_generated_data/uniform.parquet"
+database: "archive/djp_generated_data/gaussian.parquet"
 result_location: "results/"
 outlier_detection_technique: "combo"
 machine_learning_model: "linear_regression"
@@ -21,17 +21,5 @@ runtime_parameters:
     split_size: 4
     preprocess_data: false
     postprocess_data: true
-    batch_size: "20MB"
+    batch_size: "256MB"
     batch_method: array_index
-
-# Specifies which features are used to predictors for other features
-# If automate_feature_selection is set to true, this section will be ignored
-predicted_by:
-  "age":
-    - "employeeID"
-  "salary":
-    - "employeeID"
-  "yearsOfExperience":
-    - "employeeID"
-  "firstYearAtCompany":
-    - "employeeID"

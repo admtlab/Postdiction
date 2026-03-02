@@ -1,0 +1,259 @@
+database: archive/sntemp_inputs_outputs_lordville_with_index.parquet
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: "linear_regression"
+automate_feature_selection: false
+use_one_predictor: true
+use_global_accuracy: true
+use_one_model_type: true
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+planned_clusters: 2
+approximate_sampled_rows: 10000000
+sampling_seed: 17
+sample_max_attempts: 5
+num_processes: 22
+index_column_name: "Index"
+memory_logging: false
+# max_unsupervised_depth: 1000
+
+runtime_parameters:
+  choice_7:
+    predictor:
+      - "seg_tave_gw"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    machine_learning_model: "linear_regression"
+    accuracy: 1
+    split_size: 4
+    preprocess_data: false
+    postprocess_data: true
+    batch_size: "64MB"
+    batch_method: array_index
+    persist_structures: false
+    build_analysis: true
+    provide_error: true
+
+# Specifies the behavior for missing values
+handle_nulls:
+  seg_id_nat:
+    method: outliers
+    replacement_value: -1
+  model_idx:
+    method: outliers
+    replacement_value: -1
+  date:
+    method: outliers
+    replacement_value: -1
+  seg_ccov:
+    method: outliers
+    replacement_value: -1
+  seginc_gwflow:
+    method: outliers
+    replacement_value: -1
+  seg_outflow:
+    method: outliers
+    replacement_value: -1
+  seg_rain:
+    method: outliers
+    replacement_value: -1
+  seg_shade:
+    method: outliers
+    replacement_value: -1
+  seg_tave_air:
+    method: outliers
+    replacement_value: -100
+  seg_tave_gw:
+    method: outliers
+    replacement_value: -300
+  seg_tave_sroff:
+    method: outliers
+    replacement_value: -1
+  seg_tave_ss:
+    method: outliers
+    replacement_value: -1
+  seg_tave_upstream:
+    method: outliers
+    replacement_value: -1
+  seg_tave_water:
+    method: outliers
+    replacement_value: -1
+  seg_upstream_inflow:
+    method: outliers
+    replacement_value: -1
+  seg_width:
+    method: outliers
+    replacement_value: -1
+  seg_humid:
+    method: outliers
+    replacement_value: -1
+  seginc_potet:
+    method: outliers
+    replacement_value: -1
+  seginc_sroff:
+    method: outliers
+    replacement_value: -1
+  seginc_ssflow:
+    method: outliers
+    replacement_value: -1
+  seginc_swrad:
+    method: outliers
+    replacement_value: -1
+  seg_length:
+    method: outliers
+    replacement_value: -1
+  seg_slope:
+    method: outliers
+    replacement_value: -1
+  seg_elev:
+    method: outliers
+    replacement_value: -1
+
+# Specifies which features are used to predictors for other features
+# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+predicted_by:
+  seg_ccov:
+    predictors:
+      - "seg_width"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_humid:
+    predictors:
+      - "seg_width"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_outflow:
+    predictors:
+      - "seg_width"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_rain:
+    predictors:
+      - "seginc_gwflow"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_shade:
+    predictors:
+      - "seginc_gwflow"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_tave_air:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_tave_sroff:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_tave_ss:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_tave_upstream:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_tave_water:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_upstream_inflow:
+    predictors:
+      - "seginc_gwflow"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seginc_potet:
+    predictors:
+      - "seginc_gwflow"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seginc_sroff:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seginc_ssflow:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seginc_swrad:
+    predictors:
+      - "seg_width"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_length:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_slope:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  seg_elev:
+    predictors:
+      - "seg_tave_gw"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index

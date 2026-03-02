@@ -1,7 +1,7 @@
 import pandas as pd
 
 from tqdm import tqdm
-from config import all_column_info
+from config import all_column_info, config_get
 from train_model import train_no_cluster_outliers, train_model, train_model_unsupervised
 
 """
@@ -83,7 +83,7 @@ class FeatureTable:
 def select_best_features(data: pd.DataFrame, clustering: str, cluster_alg: str, accuracy: float, split_size: int,
                          outlier_before: bool, outlier_after: bool,
                          accuracy_tuning: bool, planned_clusters: int, preprocess_data: bool, postprocess_data: bool,
-                         random_sample_size: float) -> dict:
+                         random_sample_size: float, use_single_accuracy: bool, per_column_accuracies: dict, use_single_model_type: bool) -> dict:
     run_results = pd.DataFrame(
         columns=['clustering_method', 'accuracy_threshold', 'min_split_size', 'num_clusters', "num_outliers",
                  'size (bytes)',
@@ -108,9 +108,22 @@ def select_best_features(data: pd.DataFrame, clustering: str, cluster_alg: str, 
                 feature_pairs.append((x, y))
 
     for pair in tqdm(feature_pairs, desc="Testing all inputs/outputs", ascii=' ='):
-        process_feature_pair(clustering, run_results, sampled_data, cluster_alg, outlier_before, outlier_after,
-                             accuracy_tuning, accuracy, planned_clusters, split_size, preprocess_data, postprocess_data,
-                             pair[0], pair[1], compression_table)
+        if use_single_model_type:
+            clustering = per_column_accuracies[pair[1].name]['clustering']
+            cluster_alg = per_column_accuracies[pair[1].name]['cluster_alg']
+            if clustering == 'supervised':
+                planned_clusters = per_column_accuracies[pair[1].name]['planned_clusters']
+
+        if use_single_accuracy:
+            process_feature_pair(clustering, run_results, sampled_data, cluster_alg, outlier_before, outlier_after,
+                                 accuracy_tuning, accuracy, planned_clusters, split_size, preprocess_data, postprocess_data,
+                                 pair[0], pair[1], compression_table)
+        else:
+            col_accuracy = per_column_accuracies[pair[1].name]['accuracy']
+            process_feature_pair(clustering, run_results, sampled_data, cluster_alg, outlier_before, outlier_after,
+                                 accuracy_tuning, col_accuracy, planned_clusters, split_size, preprocess_data,
+                                 postprocess_data,
+                                 pair[0], pair[1], compression_table)
 
     best_predictor = compression_table.get_feature_with_lowest_sum(len(data))
     print("Best Predictor: " + best_predictor.name)
@@ -139,18 +152,32 @@ def process_feature_pair(clustering: str, run_results: pd.DataFrame, sampled_dat
     compression_table.print_table()
 
 
-def create_dictionary_based_on_best(best_predictor: Feature, valid_features: list) -> dict:
+def create_dictionary_based_on_best(best_predictors: list[Feature], valid_features: list) -> dict:
     xy_pairs = {}
-    for feature in valid_features:
-        if best_predictor.name != feature.name:
-            xy_pairs[feature.name] = [best_predictor.name]
+
+    assert len(best_predictors) > 0
+
+    if len(best_predictors) == 1:
+        best_predictor = best_predictors[0].name
+        for feature in valid_features:
+            if best_predictor != feature.name:
+                xy_pairs[feature.name] = [best_predictor]
+    else:
+        predictor_names = [f.name for f in best_predictors]
+        for feature in valid_features:
+            if feature.name not in predictor_names:
+                xy_pairs[feature.name] = predictor_names
 
     return xy_pairs
 
 
-def remove_features_below_size(features: list[Feature], minimum_size=4) -> list[Feature]:
+def remove_features_below_size(features: list[Feature], minimum_size=2) -> list[Feature]:
+    excluded_attributes = config_get('excluded_attributes')
+    if excluded_attributes is None:
+        excluded_attributes = []
+
     filtered_features = [feature for feature in features if
-                         feature.size >= minimum_size and feature.type != 'index' and feature.type != 'date']
+                         feature.size >= minimum_size and feature.type != 'index' and feature.type != 'date' and feature.name not in excluded_attributes]
     return filtered_features
 
 
@@ -164,9 +191,9 @@ def load_features() -> list[Feature]:
     return feature_list
 
 
-def create_dictionary_with_predictor(predictor: str) -> dict[str, list[str]]:
+def create_dictionary_with_predictor(predictors: list[str]) -> dict[str, list[str]]:
     valid_features = remove_features_below_size(load_features())
-    best_feature = Feature(predictor, None, 0)
-    xy_pairs = create_dictionary_based_on_best(best_feature, valid_features)
+    best_features = [Feature(p, None, 0) for p in predictors]
+    xy_pairs = create_dictionary_based_on_best(best_features, valid_features)
     return xy_pairs
 

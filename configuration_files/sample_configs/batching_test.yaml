@@ -1,0 +1,176 @@
+database: "archive/real_measurements_airquality_with_index.parquet"
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: "linear_regression"
+automate_feature_selection: false
+use_one_predictor: true
+use_global_accuracy: true
+use_one_model_type: true
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+planned_clusters: 2
+approximate_sampled_rows: 10000000
+sampling_seed: 17
+sample_max_attempts: 5
+num_processes: 22
+index_column_name: "Index"
+memory_logging: false
+max_unsupervised_depth: 1000
+excluded_attributes:
+  - "time_taken"
+  - "altitude"
+
+runtime_parameters:
+  choice_7:
+    predictor:
+      - "microcontroller_id"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    machine_learning_model: "linear_regression"
+    accuracy: 1
+    split_size: 4
+    preprocess_data: false
+    postprocess_data: true
+    batch_size: "64MB"
+    batch_method: array_index
+    persist_structures: false
+    build_analysis: true
+    provide_error: true
+
+# Specifies the behavior for missing values
+handle_nulls:
+  microcontroller_id:
+    method: outliers
+    replacement_value: -1
+  co:
+    method: outliers
+    replacement_value: -1
+  nox:
+    method: outliers
+    replacement_value: -1
+  no2:
+    method: outliers
+    replacement_value: -1
+  o3:
+    method: outliers
+    replacement_value: -1
+  pm2_5:
+    method: outliers
+    replacement_value: -1
+  pm10:
+    method: outliers
+    replacement_value: -1
+  so2:
+    method: outliers
+    replacement_value: -1
+  latitude:
+    method: outliers
+    replacement_value: -100
+  longitude:
+    method: outliers
+    replacement_value: -300
+  "c6h6":
+    method: outliers
+    replacement_value: -1
+  "no":
+    method: outliers
+    replacement_value: -1
+  "time_taken":
+    method: outliers
+    replacement_value: 1262304000
+
+# Specifies which features are used to predictors for other features
+# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+# predicted_by:
+#   co:
+#     predictors:
+#       - "microcontroller_id"
+#     accuracy: 1
+#     model: "linear_regression LR"
+#     clustering: unsupervised
+#     cluster_alg: Minhal
+#     batch_method: array_index
+#     planned_clusters: 2
+#  nox:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  no2:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  o3:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  pm2_5:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  pm10:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  so2:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  latitude:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  longitude:
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+#  "c6h6":
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index
+##  "altitude":
+##    - "microcontroller_id"
+#  "no":
+#    predictors:
+#      - "microcontroller_id"
+#    accuracy: 1
+#    model: 'linear_regression LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: array_index

@@ -5,8 +5,9 @@ does not add noise. Currently only the first function is used in the pipeline.
 """
 import pandas as pd
 import numpy as np
-from config import column_variable_get
+from config import column_variable_get, config_get
 
+column_index_variable = config_get('index_column_name')
 
 def data_big_with_noise(data: pd.DataFrame, multiplier: int, expanded_file_name: str) -> pd.DataFrame:
     """
@@ -38,7 +39,7 @@ def data_big_with_noise(data: pd.DataFrame, multiplier: int, expanded_file_name:
                 expanded_data.loc[original_length:, column_name])
 
     # Reset index for all rows
-    expanded_data['Index'] = range(1, len(expanded_data) + 1)
+    expanded_data[column_index_variable] = range(1, len(expanded_data) + 1)
 
     # Save file to given new name
     if expanded_file_name is not None:
@@ -55,8 +56,8 @@ def data_big(data: pd.DataFrame, multiplier: int, expanded_file_name: str) -> pd
     expanded_data = pd.concat(dfs, ignore_index=True)
 
     # Reset the 'Index' column starting from max_index + 1
-    max_index = max(expanded_data['Index']) + 1
-    expanded_data['Index'] = range(max_index, max_index + len(expanded_data))
+    max_index = max(expanded_data[column_index_variable]) + 1
+    expanded_data[column_index_variable] = range(max_index, max_index + len(expanded_data))
 
     # Save file to given name
     if expanded_file_name is not None:
@@ -87,6 +88,7 @@ def shrink_file(data: pd.DataFrame, desired_number_of_records: int, destination:
 
 def main():
     data = pd.read_csv('archive/sntemp_inputs_outputs_lordville.csv', sep=',')
+    # data = pd.read_csv('archive/cardio_train.csv', sep=',')
     shrink_file(data, 20000, 'archive/sntemp_inputs_outputs_lordville_mini.csv')
 
 

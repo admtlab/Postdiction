@@ -1,21 +1,24 @@
 import numpy as np
 import pandas as pd
 import os
+import warnings
+import statistics
 
 from keras.models import Sequential
-from keras.layers import LSTM, Dense
+from keras.layers import LSTM, Dense, Input
 from sklearn.linear_model import LinearRegression
 
 import models
 from config import config_get
+from pathlib import Path
 
-from helper import list_of_percent_differences
+from helper import list_of_percent_differences, list_of_cosine_similarities
 
-MODEL_FUNCTION = config_get("machine_learning_model")
+column_index_variable = config_get('index_column_name')
 
 
 class Cluster:
-    def __init__(self, model, inliers: list[int], original_y_values: list[float], predicted_y_values: list[float], value=None):
+    def __init__(self, model, inliers: list[int], original_y_values: list[float], predicted_y_values: list[float], value=None, predicting_feature_count=1, representative_point:list=None, cluster_index=0):
         """
         Initialize a Cluster object with model,inliers, original y values, and predicted y values. Size represents the number of values that have
         been flushed from a cluster (i.e. cleared out from inliers/original_y_values/predicted_y_values for memory purposes)
@@ -29,16 +32,27 @@ class Cluster:
         self.model = model
         self.value = value
         self.inliers = inliers
+        self.cluster_index = cluster_index + 1
+
         self.size = 0
         self.original_y_values = original_y_values
         self.predicted_y_values = predicted_y_values
-        self.sample_y_value = model.predict(np.array([[0]]))
+        if representative_point is None:
+            predictor_array = [0 for _ in range(0, predicting_feature_count)]
+            self.sample_y_value = model.predict(np.array([predictor_array]))
+            self.representative_point = None
+        else:
+            self.sample_y_value = model.predict(np.array(representative_point).reshape(1, -1))
+            self.representative_point = representative_point + [self.sample_y_value.item()]
 
     def length(self):
         """
         Return the length of the inliers list.
         """
-        return len(self.inliers)
+        if len(self.inliers) > 0:
+            return len(self.inliers)
+
+        return self.size
 
     def __lt__(self, other):
         """
@@ -65,6 +79,7 @@ class Cluster:
             self.size += 1
         if original_y_value:
             self.original_y_values.append(original_y_value)
+
         if predicted_y_value:
             self.predicted_y_values.append(predicted_y_value)
 
@@ -73,7 +88,7 @@ class Cluster:
         Clears out original_y_values and predicted_y_values and inliers. This is for large datasets that can't store all of this
         information in memory
         """
-        self.size += len(self.inliers)
+        self.size = len(self.inliers)
 
         if destination is not None:
             inlier_csv_path = destination.parent / f'{predicted_label}' / f'partition-{cur_partition_num}.csv'
@@ -91,8 +106,7 @@ class Cluster:
         self.predicted_y_values = []
 
 
-
-def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, percent_acceptable: float, metric="accuracy") -> tuple[models.Cluster, list]:
+def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, percent_acceptable: float, metric="accuracy", cluster_index=0) -> tuple[models.Cluster, list]:
     """
     Trains a model on the provided `data` and evaluates its performance. 
     Returns a Cluster object containing inliers, representing data points predicted within a specified threshold.
@@ -104,7 +118,8 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
         - percent_acceptable (float): The acceptable percentage deviation from the true values for inliers.
         
     Returns:
-        - cluster (Cluster): A Cluster object containing inliers predicted by the model.
+        - cluster (Cluster): A Cluster object containing inliers predicted by the model. None is returned if all values
+            are marked as outliers (i.e., no inliers are detected due to error, model choice, etc.)
         - outliers (list of int): A list of indices corresponding to outliers predicted by the model.
     """
 
@@ -112,14 +127,16 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
     model, y_pred = run_model(data, x_label, y_label)
 
     # Add y_pred to the stripped table
-    stripped_table = data[["Index", y_label]].copy()
+    stripped_table = data[[column_index_variable, y_label]].copy()
     stripped_table["y_pred"] = list(y_pred)
 
     # Calculate absolute percentage error
     y = list(np.array(data[y_label]))
     if metric == "cosine":
-        raise Exception("Cosine similarity accuracy metric currently not implemented")
+        abs_cosine_similarity = list_of_cosine_similarities(y, list(y_pred))
+        stripped_table["abs_cosine_similarity"] = abs_cosine_similarity
     elif metric == "jaccard":
+        # TODO: Implement Jaccard Similarity accuracy metric
         raise Exception("Jaccard Similarity accuracy metric currently not implemented")
     else:
         abs_percentage_error = list_of_percent_differences(y, list(y_pred))
@@ -129,6 +146,7 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
         inliers_table = stripped_table[stripped_table["abs_cosine_similarity"] >= percent_acceptable]
         outliers_table = stripped_table[stripped_table["abs_cosine_similarity"] < percent_acceptable]
     elif "abs_jaccard_similarity" in stripped_table:
+        # TODO: Implement Jaccard Similarity accuracy metric
         pass
     else:
         # Filter rows to get inliers and outliers table
@@ -136,15 +154,15 @@ def train_and_evaluate_model(data: pd.DataFrame, x_label: str, y_label: str, per
         outliers_table = stripped_table[stripped_table["abs_percentage_error"] > percent_acceptable]
 
     # Get inliers and outliers as lists
-    inliers = inliers_table["Index"].tolist()
-    outliers = outliers_table["Index"].tolist()
+    inliers = inliers_table[column_index_variable].tolist()
+    outliers = outliers_table[column_index_variable].tolist()
 
     # Get original and predicted values from the inliers table
     inliers_original_y = inliers_table[y_label].tolist()
     inliers_predicted_y = inliers_table["y_pred"].tolist()
 
     # Create a Cluster object with additional fields for original and predicted y values
-    cluster = Cluster(model, inliers, inliers_original_y, inliers_predicted_y)
+    cluster = Cluster(model, inliers, inliers_original_y, inliers_predicted_y, cluster_index=cluster_index)
 
     return cluster, outliers
 
@@ -154,13 +172,20 @@ def run_model(data: pd.DataFrame, x_label: str, y_label: str):
         "lstm": create_lstm,
         "linear_regression": create_linear_regression
     }
+    model_function = config_get("machine_learning_model")
+
+    # Check if one global model type is used or if each column is specified
+    use_one_model_type = config_get("use_one_model_type")
+    if not use_one_model_type:
+        predictors_dict = config_get("predicted_by")
+        model_function = predictors_dict[y_label]['model']
     # Get the corresponding function based on the model_type
-    model_func = models.get(MODEL_FUNCTION)
+    model_func = models.get(model_function)
     if model_func:
         return model_func(data, x_label, y_label)
     else:
         return "Unknown model type"
-
+    
 
 def extract_xy_columns(data: pd.DataFrame, x_label: str, y_label):
     if pd.api.types.is_numeric_dtype(data[x_label]):
@@ -197,8 +222,16 @@ def create_lstm(data: pd.DataFrame, x_label: str, y_label: str) -> tuple:
     original_y_values = data[y_label].values.reshape(-1, 1)
 
     # normalizing the input age data ensures that all age values are scaled to the range [0,1]
-    normalized_x = (original_x_values - np.mean(original_x_values)) / np.std(original_x_values)
-    normalized_y = (original_y_values - np.mean(original_y_values)) / np.std(original_y_values)
+    if np.std(original_x_values) != 0.0:
+        normalized_x = (original_x_values - np.mean(original_x_values)) / np.std(original_x_values)
+    else:
+        normalized_x = original_x_values
+
+    if np.std(original_y_values) != 0.0:
+        normalized_y = (original_y_values - np.mean(original_y_values)) / np.std(original_y_values)
+    else:
+        normalized_y = original_y_values
+
 
     X = np.array(normalized_x)
     y = np.array(normalized_y)
@@ -206,8 +239,9 @@ def create_lstm(data: pd.DataFrame, x_label: str, y_label: str) -> tuple:
     # Define LSTM model
     model = Sequential()
     sequence_length = 1
+    model.add(Input(shape=(sequence_length, 1)))
     model.add(
-        LSTM(64, input_shape=(sequence_length, 1)))  # this 1 represents the number of strs. age is the only one
+        LSTM(64))  # this 1 represents the number of strs. age is the only one
     model.add(Dense(1))
 
     # Compile and train model
@@ -227,6 +261,20 @@ def create_lstm(data: pd.DataFrame, x_label: str, y_label: str) -> tuple:
 
 def create_linear_regression(data: pd.DataFrame, x_label: str, y_label: str) -> tuple:
     x, y = extract_xy_columns(data, x_label, y_label)
+
+    # Initialize Linear Regression model
+    model = LinearRegression().fit(x, y)
+
+    # predict y values based on input x
+    y_pred = model.predict(x)
+
+    return model, y_pred
+
+
+def create_multiple_regression(data: pd.DataFrame, x_label: list[str], y_label: str) -> tuple:
+    # x, y = extract_xy_columns(data, x_label, y_label)
+    x = data[x_label].to_numpy()
+    _, y = extract_xy_columns(data, x_label[0], y_label)
 
     # Initialize Linear Regression model
     model = LinearRegression().fit(x, y)

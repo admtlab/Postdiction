@@ -1,0 +1,167 @@
+database: archive/cardio_train.parquet
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: "linear_regression"
+automate_feature_selection: false
+use_one_predictor: true
+use_global_accuracy: true
+use_one_model_type: true
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+planned_clusters: 2
+approximate_sampled_rows: 1000000000
+sampling_seed: 17
+sample_max_attempts: 5
+num_processes: 22
+index_column_name: "Index"
+memory_logging: false
+# max_unsupervised_depth: 1000
+
+runtime_parameters:
+  choice_7:
+    predictor:
+      - "ap_hi"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    machine_learning_model: "linear_regression"
+    accuracy: 1
+    split_size: 4
+    preprocess_data: false
+    postprocess_data: true
+    batch_size: "64MB"
+    batch_method: array_index
+    persist_structures: false
+    build_analysis: true
+    provide_error: true
+
+# Specifies the behavior for missing values
+handle_nulls:
+  age:
+    method: outliers
+    replacement_value: -1
+  gender:
+    method: outliers
+    replacement_value: -1
+  height:
+    method: outliers
+    replacement_value: -1
+  weight:
+    method: outliers
+    replacement_value: -1
+  ap_hi:
+    method: outliers
+    replacement_value: -1
+  ap_lo:
+    method: outliers
+    replacement_value: -1
+  cholesterol:
+    method: outliers
+    replacement_value: -1
+  gluc:
+    method: outliers
+    replacement_value: -1
+  smoke:
+    method: outliers
+    replacement_value: -100
+  alco:
+    method: outliers
+    replacement_value: -300
+  active:
+    method: outliers
+    replacement_value: -1
+  cardio:
+    method: outliers
+    replacement_value: -1
+
+# Specifies which features are used to predictors for other features
+# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+predicted_by:
+  age:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  gender:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  height:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  ap_hi:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  ap_lo:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  cholesterol:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  gluc:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  smoke:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  alco:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  active:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index
+  cardio:
+    predictors:
+      - "weight"
+    accuracy: 1
+    model: "linear_regression"
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: array_index

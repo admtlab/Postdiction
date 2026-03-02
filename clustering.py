@@ -8,6 +8,9 @@ from sklearn.neighbors import NearestNeighbors
 from kneed import KneeLocator
 from sklearn.cluster import DBSCAN
 
+from config import config_get
+
+column_index_variable = config_get('index_column_name')
 
 #################################################### Clustering
 
@@ -59,7 +62,7 @@ def k_means(data_file: pd.DataFrame, numClusters: int, x_label: str, y_label: st
 # Method for distribution clustering
 def distribution(data: pd.DataFrame, num_clusters: int, x_label: str, y_label: str) -> list:
     # To use GMM for clustering, you need to prepare the data by selecting the relevant columns and converting them into a numpy array.
-    X = data[['Index', x_label, y_label]].values
+    X = data[[column_index_variable, x_label, y_label]].values
 
     gmm = GaussianMixture(n_components=num_clusters)  # number of clusters
     gmm.fit(X)
@@ -76,13 +79,15 @@ def distribution(data: pd.DataFrame, num_clusters: int, x_label: str, y_label: s
         axs[i].set_title(f'Cluster {i + 1}')
 
         # convert array back to a dataframe
-        dataset = pd.DataFrame({'Index': cluster[:, 0], x_label: cluster[:, 1], y_label: cluster[:, 2]})
+        dataset = pd.DataFrame({column_index_variable: cluster[:, 0], x_label: cluster[:, 1], y_label: cluster[:, 2]})
+        # cluster = pd.DataFrame(cluster)
         clusters.append(dataset)
 
+    # plt.show()
     return clusters
 
 
-# DB scan is inefficient and works
+# Db Scan clustering TODO NOT WORKING - Not using x and y variable? Also DB scan is inefficient and works
 # Better for outlier detection, not clustering
 def db_scan(data, input, x_label, y_label):
     nbrs = NearestNeighbors(n_neighbors=5).fit(data)

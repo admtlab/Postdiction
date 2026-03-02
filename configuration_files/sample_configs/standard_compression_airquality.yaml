@@ -1,0 +1,114 @@
+database: archive/real_measurements_airquality.csv
+result_location: "results/"
+machine_learning_model: "none"
+expand_data_multiplier: 0
+text_limit_training: false
+runtime_parameters:
+  lzma:
+    clustering: none
+    compression_parameters:
+      method: "lzma"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"
+  gzip:
+    clustering: none
+    compression_parameters:
+      method: "gzip"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"
+  bz2:
+    clustering: none
+    compression_parameters:
+      method: "bzip2"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"
+  zstd:
+    clustering: none
+    compression_parameters:
+      method: "zstd"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"
+  sz:
+    clustering: none
+    compression_parameters:
+      method: "sz"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"
+  zfp:
+    clustering: none
+    compression_parameters:
+      method: "zfp"
+      compressed_columns:
+        - "microcontroller_id"
+        - "co"
+        - "c6h6"
+        - "no"
+        - "nox"
+        - "no2"
+        - "o3"
+        - "pm2_5"
+        - "pm10"
+        - "so2"
+        - "latitude"
+        - "longitude"
+      encoding: "utf-8"

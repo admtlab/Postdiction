@@ -26,6 +26,7 @@ def zScore(data: pd.DataFrame, threshold: float) -> tuple[pd.DataFrame, pd.DataF
     abs_z_scores = np.abs(z_scores)
     # Find and mark outliers
     outliers = abs_z_scores > threshold
+
     # Remove outliers so this can be further edited  
     no_outliers = data_copy[~outliers.any(axis=1)]
     # Extract the rows with outliers

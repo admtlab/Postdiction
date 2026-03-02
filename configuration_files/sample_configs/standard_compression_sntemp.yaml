@@ -9,6 +9,9 @@ runtime_parameters:
     compression_parameters:
       method: "lzma"
       compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
         - "seg_ccov"
         - "seg_humid"
         - "seg_outflow"
@@ -36,6 +39,9 @@ runtime_parameters:
     compression_parameters:
       method: "gzip"
       compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
         - "seg_ccov"
         - "seg_humid"
         - "seg_outflow"
@@ -63,6 +69,9 @@ runtime_parameters:
     compression_parameters:
       method: "bzip2"
       compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
         - "seg_ccov"
         - "seg_humid"
         - "seg_outflow"
@@ -90,6 +99,69 @@ runtime_parameters:
     compression_parameters:
       method: "zstd"
       compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
+        - "seg_ccov"
+        - "seg_humid"
+        - "seg_outflow"
+        - "seg_rain"
+        - "seg_shade"
+        - "seg_tave_air"
+        - "seg_tave_gw"
+        - "seg_tave_sroff"
+        - "seg_tave_ss"
+        - "seg_tave_upstream"
+        - "seg_tave_water"
+        - "seg_upstream_inflow"
+        - "seg_width"
+        - "seginc_gwflow"
+        - "seginc_potet"
+        - "seginc_sroff"
+        - "seginc_ssflow"
+        - "seginc_swrad"
+        - "seg_length"
+        - "seg_slope"
+        - "seg_elev"
+      encoding: "utf-8"
+  sz:
+    clustering: none
+    compression_parameters:
+      method: "sz"
+      compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
+        - "seg_ccov"
+        - "seg_humid"
+        - "seg_outflow"
+        - "seg_rain"
+        - "seg_shade"
+        - "seg_tave_air"
+        - "seg_tave_gw"
+        - "seg_tave_sroff"
+        - "seg_tave_ss"
+        - "seg_tave_upstream"
+        - "seg_tave_water"
+        - "seg_upstream_inflow"
+        - "seg_width"
+        - "seginc_gwflow"
+        - "seginc_potet"
+        - "seginc_sroff"
+        - "seginc_ssflow"
+        - "seginc_swrad"
+        - "seg_length"
+        - "seg_slope"
+        - "seg_elev"
+      encoding: "utf-8"
+  zfp:
+    clustering: none
+    compression_parameters:
+      method: "zfp"
+      compressed_columns:
+        - "Index"
+        - "seg_id_nat"
+        - "model_idx"
         - "seg_ccov"
         - "seg_humid"
         - "seg_outflow"

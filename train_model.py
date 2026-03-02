@@ -1,6 +1,7 @@
 import math
 import pandas as pd
 import sys
+import statistics
 
 from config import config_get
 from clustering import k_means, distribution, db_scan, minhal_split, birch, bisecting_kmeans
@@ -11,9 +12,10 @@ from helper import get_recovered_accuracy, percent_difference, size, mse_metrics
 from preprocess import create_clusters_for_frequent_items
 
 results_location = config_get('result_location') + config_get('machine_learning_model') + "/"
+column_index_variable = config_get('index_column_name')
 
 
-def train_no_cluster_outliers(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str) -> str:
+def train_no_cluster_outliers(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, model_type='linear_regression') -> str:
     """
     Train Machine Learning model using no clustering our outlier detection
     """
@@ -25,9 +27,10 @@ def train_no_cluster_outliers(output: pd.DataFrame, data: pd.DataFrame, x: str, 
     mse_results = mse_metrics(decayed_table['Original_Y_Value'].tolist(), decayed_table['Predicted_Y_Value'].tolist())
 
     datatype_of_predicted_attribute = data.dtypes[y]
-    size_stats = size(1, 0, datatype_of_predicted_attribute, len(data))
+    size_stats = size(1, 0, datatype_of_predicted_attribute, len(data), y)
 
-    new_row = {'clustering_method': 'No Clustering/Outliers', 'num_clusters': 1, 'num_outliers': 0,
+    new_row = {'predicting_feature': x,
+                       'predicted_feature': y, 'ml_method': model_type, 'clustering_method': 'No Clustering/Outliers', 'num_clusters': 1, 'num_outliers': 0,
                'size (bytes)': str(size_stats[0]), 'original_size (bytes)': str(size_stats[1]),
                'percentage_of_original_size': str(size_stats[2]) + '%',
                'average_percent_difference': str(percent_difference(decayed_table['Original_Y_Value'].tolist(),
@@ -64,7 +67,7 @@ def file_name_info(outlier_before: bool, outlier_after: bool, accuracy_threshold
 
 
 def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, clustering_method: str, outlier_before: bool, outlier_after: bool, accuracy_threshold: float,
-                acceptable_threshold: float, planned_clusters: int) -> tuple[list, list]:
+                acceptable_threshold: float, planned_clusters: int, model_type='linear_regression') -> tuple[list, list]:
     """
     Takes data and runs the model on that data. There will be clustering done on the data using the `clustering_method` passed to the function.
     If `outlier_before` is true the function will do outlier detection before clustering. If `outlier_after` is set to true, the function will
@@ -80,7 +83,7 @@ def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, cluste
     # cluster before if specified
     if outlier_before:
         new_data = outlier_detection(data, 3)
-        outliers_all.extend(new_data[0]["Index"].tolist())  # add outliers to outlier list
+        outliers_all.extend(new_data[0][column_index_variable].tolist())  # add outliers to outlier list
         data = new_data[1]
 
     match clustering_method:
@@ -101,7 +104,7 @@ def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, cluste
         # Outlier detection after clustering
         if (outlier_after):
             new_data = outlier_detection(clustered_data[i], 3)
-            outliers = new_data[0]["Index"].tolist()  # add outliers to outlier list
+            outliers = new_data[0][column_index_variable].tolist()  # add outliers to outlier list
             current_data = new_data[1]  # All non outlier values
             outliers_all.extend(outliers)
 
@@ -112,11 +115,10 @@ def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, cluste
         if (len(current_data) <= 1):
             # If there is a single value in this cluster add it to outliers
             if (len(current_data) == 1):
-                outliers_all.extend(current_data[0]["Index"].tolist())
+                outliers_all.extend(current_data[0][column_index_variable].tolist())
         else:
             # model Running
-            print(len(clustered_data))
-            model_results = train_and_evaluate_model(current_data, x, y, acceptable_threshold)
+            model_results = train_and_evaluate_model(current_data, x, y, acceptable_threshold, cluster_index=i)
 
             current_cluster = model_results[0]
             clusters.append(current_cluster)
@@ -130,10 +132,11 @@ def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, cluste
     mse_results = mse_metrics(decayed_table['Original_Y_Value'].tolist(), decayed_table['Predicted_Y_Value'].tolist())
 
     datatype_of_predicted_attribute = data.dtypes[y]
-    size_stats = size(len(clusters), len(outliers_all), datatype_of_predicted_attribute, original_data_length)
+    size_stats = size(len(clusters), len(outliers_all), datatype_of_predicted_attribute, original_data_length, y)
 
     # Row to be added to output
-    new_row = {'clustering_method': file_info, 'num_clusters': len(clustered_data), 'num_outliers': len(outliers_all),
+    new_row = {'predicting_feature': x,
+                       'predicted_feature': y, 'ml_method': model_type, 'clustering_method': file_info, 'num_clusters': len(clustered_data), 'num_outliers': len(outliers_all),
                'size (bytes)': str(size_stats[0]), 'original_size (bytes)': str(size_stats[1]),
                'percentage_of_original_size': str(size_stats[2]) + '%',
                'average_percent_difference': str(percent_difference(decayed_table['Original_Y_Value'].tolist(),
@@ -149,7 +152,7 @@ def train_model(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, cluste
 
 
 def train_model_unsupervised(output: pd.DataFrame, data: pd.DataFrame, x: str, y: str, clustering_method: str, acceptable_threshold: float, min_split_size: int,
-                             preprocess_data: bool, split_cluster_size=2) -> tuple[list, list]:
+                             preprocess_data: bool, split_cluster_size=2, model_type = 'linear_regression') -> tuple[list, list]:
     """
     This function trains a model using unsupervised learning. It creates a ML model and removes values that satisfy the `acceptable_threshold`
     variable (i.e. 5%, 10%, error etc.). If the length of the resulting outliers is greater than `min_split_size`, the data will be 
@@ -169,57 +172,66 @@ def train_model_unsupervised(output: pd.DataFrame, data: pd.DataFrame, x: str, y
     else:
         data_to_train_on = data.copy()
 
+
     def train_and_split(data: pd.DataFrame, depth: int):
         """
-        Recursive function that trains a model on `data`. If the outliers are greater than `min_split_size`, than cluster
-        and repeat on the clusters. `depth` is used to track number of function calls for graphing and data display purposes.
+        Iterative replacement for the recursive train_and_split().
+        Uses an explicit stack of (dataframe, depth) to avoid recursion overhead.
         """
         nonlocal outliers_all
         nonlocal current_cluster_number
         nonlocal clusters
+        max_depth = config_get('max_unsupervised_depth')
 
-        if len(data) < 2:
-            outliers_all.extend(data["Index"].tolist())
-            return
+        stack = [(data, depth)]
+        cluster_index = 0
 
-        # Train model. Add resulting cluster to list of clusters
-        model_results = train_and_evaluate_model(data, x, y, acceptable_threshold)
-        current_cluster = model_results[0]
-        clusters.append(current_cluster)
+        while stack:
+            cur_data, cur_depth = stack.pop()
 
-        outliers = model_results[1]
+            # If current cluster has less than 2 elements in it, add it to outliers rather than training a model for it
+            if len(cur_data) < 2:
+                outliers_all.extend(cur_data[column_index_variable].tolist())
+                continue
 
-        if len(outliers) + current_cluster.length() != len(data):
-            raise ValueError(
-                "The sum of outliers length and current_cluster length does not match the length of the data.")
+            if max_depth is not None and current_cluster_number > max_depth:
+                break
 
-        # Get indices of outlier table and reconstruct table with only those rows present
-        data_to_split = data[data['Index'].isin(outliers)]
+            # Train model. Add resulting cluster to list of clusters
+            model_results = train_and_evaluate_model(cur_data, x, y, acceptable_threshold, cluster_index=cluster_index)
+            current_cluster = model_results[0]
+            clusters.append(current_cluster)
+            cluster_index += 1
 
-        try:
+            outliers = model_results[1]
+
+            if len(outliers) + current_cluster.length() != len(cur_data):
+                raise ValueError(
+                    f"The sum of outliers length and current_cluster length does not match the length of the data."
+                    f"Outliers: {len(outliers)}, Clusters Length: {current_cluster.length()}, Data Length: {len(cur_data)}")
+
+            # Reconstruct table with only outlier rows
+            data_to_split = cur_data[cur_data[column_index_variable].isin(outliers)]
+
             if len(outliers) > min_split_size:
                 match clustering_method:
                     case 'KM':
-                        cluster = k_means(data_to_split, split_cluster_size, x, y)
+                        subclusters = k_means(data_to_split, split_cluster_size, x, y)
                     case 'Dist':
-                        cluster = distribution(data_to_split, split_cluster_size, x, y)
+                        subclusters = distribution(data_to_split, split_cluster_size, x, y)
                     case 'Minhal':
-                        cluster = minhal_split(data_to_split, current_cluster.model, x, y)
+                        subclusters = minhal_split(data_to_split, current_cluster.model, x, y)
                     case 'Birch':
-                        cluster = birch(data_to_split, split_cluster_size, x, y)
+                        subclusters = birch(data_to_split, split_cluster_size, x, y)
                     case 'Bisect':
-                        cluster = bisecting_kmeans(data_to_split, split_cluster_size, x, y)
+                        subclusters = bisecting_kmeans(data_to_split, split_cluster_size, x, y)
 
-                for i in range(0, len(cluster)):
+                # push subclusters onto stack for further processing (depth-first, mirroring previous recursion)
+                for sub in subclusters:
                     current_cluster_number += 1
-                    depth = depth + 1
-                    train_and_split(cluster[i], depth)
-                    depth = depth - 1
+                    stack.append((sub, cur_depth + 1))
             else:
                 outliers_all.extend(outliers)
-        except RecursionError:
-            print(f"[Warning] Exceeded Python's Recursion Limit of {sys.getrecursionlimit()} at depth {depth}. Adding {len(outliers)} outliers and exiting recursive function. Be aware that this may limit results.")
-            outliers_all.extend(outliers)
 
         return
 
@@ -230,10 +242,11 @@ def train_model_unsupervised(output: pd.DataFrame, data: pd.DataFrame, x: str, y
     decayed_table = create_decayed_table(data, clusters, outliers_all, y)
     mse_results = mse_metrics(decayed_table['Original_Y_Value'].tolist(), decayed_table['Predicted_Y_Value'].tolist())
 
-    size_stats = size(len(clusters), len(outliers_all), datatype_of_predicted_attribute, len(data))
+    size_stats = size(len(clusters), len(outliers_all), datatype_of_predicted_attribute, len(data), y)
 
     # Row to be added to output
-    new_row = {'clustering_method': file_info, 'num_clusters': len(clusters), 'num_outliers': len(outliers_all),
+    new_row = {'predicting_feature': x,
+                       'predicted_feature': y, 'ml_method': model_type, 'clustering_method': file_info, 'num_clusters': len(clusters), 'num_outliers': len(outliers_all),
                'size (bytes)': str(size_stats[0]), 'original_size (bytes)': str(size_stats[1]),
                'percentage_of_original_size': str(size_stats[2]) + '%',
                'average_percent_difference': str(percent_difference(decayed_table['Original_Y_Value'].tolist(),
@@ -274,13 +287,13 @@ def create_decayed_table(data: pd.DataFrame, clusters: list[Cluster], outliers: 
 
     # For outliers
     for index in outliers:
-        original_y_list.append(data.loc[data['Index'] == index, y_label].iloc[0])
-        predicted_y_list.append(data.loc[data['Index'] == index, y_label].iloc[0])
+        original_y_list.append(data.loc[data[column_index_variable] == index, y_label].iloc[0])
+        predicted_y_list.append(data.loc[data[column_index_variable] == index, y_label].iloc[0])
         index_list.append(index)
 
     # Create DataFrame
-    data = {'Index': index_list, 'Original_Y_Value': original_y_list, 'Predicted_Y_Value': predicted_y_list}
+    data = {column_index_variable: index_list, 'Original_Y_Value': original_y_list, 'Predicted_Y_Value': predicted_y_list}
     df = pd.DataFrame(data)
-    df.sort_values(by='Index', inplace=True)
+    df.sort_values(by=column_index_variable, inplace=True)
 
     return df
