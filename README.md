@@ -10,7 +10,7 @@ For the AFD detection using the Pyro algorithm, the `Pyro-distro-1.0-SNAPSHOT-di
 
 ### Environment
 
-All of the experiments were conducted on physical hardware using a Thinkpad P14S Gen 5 equipped with an Intel Ultra 7 155H CPU with 22 logical processors with 64 GB of RAM. Scalability experiments were conducted on a Thinkpad T470 equipped with an Intel Core i5-7300U CPU with 4 logical processors and 16 GB of RAM.
+All of the experiments were conducted on physical hardware using a Thinkpad P14S Gen 5 equipped with an Intel Ultra 7 155H CPU with 22 logical processors with 64 GB of RAM. Scalability experiments were also conducted on a Thinkpad T470 equipped with an Intel Core i5-7300U CPU with 4 logical processors and 16 GB of RAM.
 
 ## Citations
 
