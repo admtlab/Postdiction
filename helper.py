@@ -1,5 +1,6 @@
 import functools
 import math
+import sys
 from typing import Callable
 
 import numpy as np
@@ -109,42 +110,47 @@ def get_record_size(data):
 
 def append_outlier_records(outliers, row_indices, attribute_index, datatype: str, file_path):
     """
-    Append outlier records to a temp file.
-    Each record = [row_index][attribute_index][value]
+    The expected format of every temporary file is:
+    [record_size: unsigned 32 bit integer]
+    [record][record]
+    where every record is (unsigned 64 bit integer for row index, unsigned 32 bit integer for attribute index, float 32 or 64)
     """
     byte_width = np.dtype(datatype).itemsize
     float_fmt_map = {4: "f", 8: "d"}
     float_fmt = float_fmt_map[byte_width]
 
-    # Full record format: row_index (I), attribute_index (H), value (float_fmt)
     fmt = f">I H {float_fmt}"
+    record_size = struct.calcsize(fmt)
+
+    # If file is new, write a 4-byte header with record_size
+    if not file_path.exists() or file_path.stat().st_size == 0:
+        with open(file_path, "wb") as f:
+            f.write(struct.pack(">I", record_size))
 
     with open(file_path, "ab") as f:
         for row_idx, val in zip(row_indices, outliers):
-            row_idx = int(row_idx)
-            attribute_index = int(attribute_index)
-            val = float(val)
-
-            f.write(struct.pack(fmt, row_idx, attribute_index, val))
+            f.write(struct.pack(fmt, int(row_idx), int(attribute_index), float(val)))
 
 
-def sort_temp_file_in_chunks(temp_path, record_size, chunk_size_bytes=5_000_000):
 
-    # See how many records would fit within a chunk (rounded down) and use that to choose a chunk size accordingly
-    records_per_chunk = chunk_size_bytes // record_size
-    updated_chunk_size = record_size * records_per_chunk
-
-    assert (updated_chunk_size % record_size) == 0
-
+def sort_temp_file_in_chunks(temp_path, chunk_size_bytes=5_000_000):
     chunks = []
 
     with open(temp_path, "rb") as f:
+        # Read record size from header
+        header = f.read(4)
+        record_size = struct.unpack(">I", header)[0]
+
+        # Compute chunk size aligned to record boundaries
+        records_per_chunk = chunk_size_bytes // record_size
+        updated_chunk_size = records_per_chunk * record_size
+
         while True:
             chunk = f.read(updated_chunk_size)
             if not chunk:
                 break
 
-            # Break chunk into records
+            # Split into records
             records = [
                 chunk[i:i+record_size]
                 for i in range(0, len(chunk), record_size)
@@ -156,12 +162,16 @@ def sort_temp_file_in_chunks(temp_path, record_size, chunk_size_bytes=5_000_000)
             # Write sorted chunk to a new file
             chunk_path = temp_path.with_suffix(f".chunk{len(chunks)}")
             with open(chunk_path, "wb") as cf:
+                # Write the same header
+                cf.write(struct.pack(">I", record_size))
+
                 for rec in records:
                     cf.write(rec)
 
             chunks.append(chunk_path)
 
-    return chunks
+    return record_size, chunks
+
 
 
 def load_cluster_map_files(cluster_map_root: Path) -> dd.DataFrame:
@@ -207,29 +217,50 @@ def load_cluster_map_files(cluster_map_root: Path) -> dd.DataFrame:
     return cluster_map
 
 
-def merge_sorted_chunks(chunk_paths, output_path, record_size):
-    files = [open(p, "rb") for p in chunk_paths]
+def merge_sorted_chunks(chunk_paths, output_path):
+    files = []
+    record_sizes = []
+
+    # Open each chunk and read its header
+    for p in chunk_paths:
+        f = open(p, "rb")
+        header = f.read(4)
+        record_size = struct.unpack(">I", header)[0]
+        files.append(f)
+        record_sizes.append(record_size)
+
+    # All chunk files must have the same record size
+    if len(set(record_sizes)) != 1:
+        raise ValueError("Chunk files have inconsistent record sizes.")
+
+    record_size = record_sizes[0]
     heap = []
 
-    # Initialize heap with first record from each file
+    # Initialize heap
     for i, f in enumerate(files):
         rec = f.read(record_size)
         if rec:
             row_idx, attr_idx = struct.unpack(">I H", rec[:6])
             heapq.heappush(heap, (row_idx, attr_idx, rec, i))
 
+    create_file_if_not_exists(output_path)
     with open(output_path, "wb") as out:
+        # Write header to final output
+        out.write(struct.pack(">I", record_size))
+
         while heap:
-            _, _, rec, file_idx = heapq.heappop(heap)
+            _, _, rec, idx = heapq.heappop(heap)
             out.write(rec)
 
-            next_rec = files[file_idx].read(record_size)
-            if next_rec:
-                row_idx, attr_idx = struct.unpack(">I H", rec[:6])
-                heapq.heappush(heap, (row_idx, attr_idx, next_rec, file_idx))
+            nxt = files[idx].read(record_size)
+            if nxt:
+                row_idx, attr_idx = struct.unpack(">I H", nxt[:6])
+                heapq.heappush(heap, (row_idx, attr_idx, nxt, idx))
 
     for f in files:
         f.close()
+
+
 
 
 def clear_temp_dir(temp_dir):
@@ -256,7 +287,20 @@ def persist_cluster(clusters: list, path_to_write: Path, model_type: str, predic
         cluster_out_ddf = dd.from_pandas(cluster_out_df, chunksize=parse_byte_size(batch_size))
         cluster_out_ddf.to_parquet(output_path, engine='pyarrow', write_index=False)
     elif model_type == 'multivariable LR':
-        raise ValueError("Multivariable LR not available in this version.")
+        model_columns = ['cluster_index'] + [f'{predictor}_slope' for predictor in predictor_features] + ['intercept']
+        cluster_out_df = pd.DataFrame(columns=model_columns)
+        cluster_out_df['cluster_index'] = [x.cluster_index for x in clusters]
+        for predictor_index, predictor in enumerate(predictor_features):
+            slopes = [x.model.coef_[predictor_index] for x in clusters]
+            cluster_out_df[f'{predictor}_slope'] = slopes
+        cluster_out_df['intercept'] = [x.model.intercept_ for x in clusters]
+        cluster_out_df = cluster_out_df.sort_values(by=['cluster_index'])
+        output_path = path_to_write / 'multiple_regression' / f'{predicted_feature}'
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        cluster_out_ddf = dd.from_pandas(cluster_out_df, chunksize=parse_byte_size(batch_size))
+        cluster_out_ddf.to_parquet(output_path, engine='pyarrow', write_index=False)
+        pass
     elif model_type == 'lstm':
         for cluster in clusters:
             output_path = path_to_write / 'lstm' / f'model_{cluster.cluster_index}'
@@ -270,6 +314,9 @@ def persist_cluster(clusters: list, path_to_write: Path, model_type: str, predic
 
 # gets the adjusted accuracy considering the accuracy of each model and the accuracy of the outliers (100%) adjusts based on amount
 def get_recovered_accuracy(y_true: list, y_pred: list, threshold: float, metric="accuracy") -> float | None:
+    if len(y_true) < 1 and len(y_pred) < 1:
+        return 100
+
     if metric == "cosine":
         cos_sim = list_of_cosine_similarities(y_true, y_pred)
 
@@ -278,8 +325,6 @@ def get_recovered_accuracy(y_true: list, y_pred: list, threshold: float, metric=
         accuracy = (above_threshold_count / len(y_true)) * 100
 
         return accuracy
-    elif metric == "jaccard":
-        pass
     else:
         percent_diff = list_of_percent_differences(y_true, y_pred)
 
@@ -327,6 +372,8 @@ def percent_difference(y_true: list, y_pred: list) -> float:
 
 
 def avg_cosine_similarity(y_true: list, y_pred: list) -> float:
+    if len(y_true) < 1 and len(y_pred) < 1:
+        return 0
     cos_sim = list_of_cosine_similarities(y_true, y_pred)
 
     avg_cos_sim = sum(cos_sim) / len(cos_sim)
@@ -360,10 +407,16 @@ def mse_metrics(y_true: list, y_pred: list, error_threshold=None) -> tuple[list[
             average, standard deviation, variance,
             number of rows whose approximated error exceeded error threshold)
     """
+    if len(y_pred) < 1 and len(y_true) < 1:
+        return [], 0, 0, 0, None
+
     sum_func = lambda a, b: a + b
 
     # Compute squared error and MSE of each value pair
-    error_lst = list(map(lambda x, y: (y - x) ** 2, y_true, y_pred))
+    if hasattr(y_pred[0], '__len__'):
+        error_lst = [np.linalg.norm(y - x) ** 2 for x, y in zip(y_true, y_pred)]
+    else:
+        error_lst = list(map(lambda x, y: (y - x) ** 2, y_true, y_pred))
     aggregate_error_total = functools.reduce(sum_func, error_lst)
     mse = aggregate_error_total / len(y_true)
 
@@ -435,28 +488,38 @@ def function_execution_in_nanoseconds(function_wrapper: Callable, *args, **kwarg
     return execution_result, elapsed_time
 
 
-def size_text(num_clusters: int, outlier_records: list, original_records: pd.DataFrame, word2vec_model_name: str) -> tuple[float, float, float]:
+def size_text(num_clusters: int, total_for_outliers: int, num_records: int, original_size: int, word2vec_model_name, x_vector_len=None) -> tuple[float, float, float, float, float, int | None, int]:
+    if x_vector_len is None:
+        x_vector_len = 1
+
     ml_models = {
         "lstm": 220_000,  # Size to store lstm model
         "linear_regression": 16,  # Size to store linear_regression model
+        "multivariable LR": (8 * x_vector_len) + 8  # (slope * predictor) + intercept
     }
 
-    num_records = len(original_records)
+    # assert outlier_records <= num_records
 
     cost_per_record_in_bits = math.ceil(
         math.log2(num_clusters + 1))  # cost associated with storing clustering information
     total_bytes_for_clusters = (cost_per_record_in_bits * num_records) // 8
 
-    total_for_storing_models = num_clusters * ml_models[config_get('machine_learning_model')]
-    total_for_outliers = sum(len(s) for s in outlier_records)
+    model_type = config_get('machine_learning_model')
+    if model_type == 'linear_regression':
+        # Use Multiple LR since vectorized text predictors require multiple slopes
+        model_type = 'multivariable LR'
+    total_for_storing_models = num_clusters * ml_models[model_type]
+    # total_for_outliers = sum(len(s) for s in outlier_records)
+    # total_for_outliers = outlier_records * max_string_len
 
     total_for_word2vec_models = os.stat(word2vec_model_name).st_size if word2vec_model_name else 0
 
-    original_size = sum(len(s) for s in original_records)
+    # original_size = sum(len(s) for s in original_records)
+    # original_size = num_records * max_string_len
     total_size = total_bytes_for_clusters + total_for_storing_models + total_for_outliers + total_for_word2vec_models
     size_as_percentage = round((total_size / original_size) * 100, 4)
 
-    return total_size, original_size, size_as_percentage
+    return total_size, original_size, size_as_percentage, total_for_storing_models, total_for_outliers, -1, cost_per_record_in_bits
 
 
 if __name__ == '__main__':

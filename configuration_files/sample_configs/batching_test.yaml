@@ -1,7 +1,7 @@
 database: "archive/real_measurements_airquality_with_index.parquet"
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: "linear_regression"
+machine_learning_model: 'linear_regression'
 automate_feature_selection: false
 use_one_predictor: true
 use_global_accuracy: true
@@ -14,29 +14,54 @@ approximate_sampled_rows: 10000000
 sampling_seed: 17
 sample_max_attempts: 5
 num_processes: 22
-index_column_name: "Index"
+index_column_name: 'Index'
 memory_logging: false
-# max_unsupervised_depth: 1000
+max_unsupervised_depth: 1000
 excluded_attributes:
   - "time_taken"
   - "altitude"
 
+
 runtime_parameters:
-  choice_7:
-    predictor:
-      - "microcontroller_id"
-    clustering: unsupervised
-    cluster_alg: Minhal
-    machine_learning_model: "linear_regression"
-    accuracy: 1
-    split_size: 4
-    preprocess_data: false
-    postprocess_data: true
-    batch_size: "64MB"
-    batch_method: array_index
-    persist_structures: false
-    build_analysis: true
-    provide_error: true
+#    choice_6:
+#      predictor:
+#        - "seginc_gwflow"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'linear_regression'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: array_index
+    choice_7:
+      predictor:
+        - "microcontroller_id"
+      clustering: unsupervised
+      cluster_alg: Minhal
+      machine_learning_model: 'linear_regression'
+      accuracy: 1
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "64MB"
+      batch_method: array_index
+      persist_structures: false
+      build_analysis: true
+      provide_error: true
+#    choice_8:
+#      predictor:
+#        - "seg_width"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'linear_regression'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: array_index
 
 # Specifies the behavior for missing values
 handle_nulls:
@@ -81,22 +106,24 @@ handle_nulls:
     replacement_value: 1262304000
 
 # Specifies which features are used to predictors for other features
-# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
-# predicted_by:
-#   co:
-#     predictors:
-#       - "microcontroller_id"
-#     accuracy: 1
-#     model: "linear_regression LR"
-#     clustering: unsupervised
-#     cluster_alg: Minhal
-#     batch_method: array_index
-#     planned_clusters: 2
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
+predicted_by:
+  co:
+    predictors:
+      - "latitude"
+      - "longitude"
+    accuracy: 1
+    model: 'multivariable LR'
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: kd_tree_index
+    planned_clusters: 2
 #  nox:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -104,7 +131,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -112,7 +139,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -120,7 +147,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -128,7 +155,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -136,7 +163,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -144,7 +171,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -152,7 +179,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -160,7 +187,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index
@@ -170,7 +197,7 @@ handle_nulls:
 #    predictors:
 #      - "microcontroller_id"
 #    accuracy: 1
-#    model: 'linear_regression LR'
+#    model: 'multivariable LR'
 #    clustering: unsupervised
 #    cluster_alg: Minhal
 #    batch_method: array_index

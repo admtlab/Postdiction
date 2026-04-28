@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from sklearn.ensemble import IsolationForest
 from config import config_get, column_variable_get
 
@@ -26,7 +26,8 @@ def zScore(data: pd.DataFrame, threshold: float) -> tuple[pd.DataFrame, pd.DataF
     abs_z_scores = np.abs(z_scores)
     # Find and mark outliers
     outliers = abs_z_scores > threshold
-
+    # Print number of outliers found
+    # print(f'Number of outliers found: {outliers.sum()}')
     # Remove outliers so this can be further edited  
     no_outliers = data_copy[~outliers.any(axis=1)]
     # Extract the rows with outliers
@@ -70,16 +71,16 @@ def combo(data: pd.DataFrame, threshold: float) -> tuple[pd.DataFrame, pd.DataFr
 
 #################################################### Helper methods
 # for plotting the outliers on a graph
-def plot_outliers(data: pd.DataFrame, outliers_only: pd.DataFrame, no_outliers: pd.DataFrame, title: str, x_label: str,
-                  y_label: str):
-    # Plot the data with outliers in red and data without outliers in blue
-    plt.scatter(no_outliers[x_label], no_outliers[y_label], color='blue', label='Non-Outliers')
-    plt.scatter(outliers_only[x_label], outliers_only[y_label], color='red', label='Outliers')
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.legend()
-    plt.show()
+# def plot_outliers(data: pd.DataFrame, outliers_only: pd.DataFrame, no_outliers: pd.DataFrame, title: str, x_label: str,
+#                   y_label: str):
+#     # Plot the data with outliers in red and data without outliers in blue
+#     plt.scatter(no_outliers[x_label], no_outliers[y_label], color='blue', label='Non-Outliers')
+#     plt.scatter(outliers_only[x_label], outliers_only[y_label], color='red', label='Outliers')
+#     plt.title(title)
+#     plt.xlabel(x_label)
+#     plt.ylabel(y_label)
+#     plt.legend()
+#     plt.show()
 
 
 def remove_unwanted_datatypes(data: pd.DataFrame) -> pd.DataFrame:

@@ -1,0 +1,168 @@
+database: "archive/wiki_stem_corpus.parquet"
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: 'lstm'
+automate_feature_selection: false
+use_one_predictor: true
+use_global_accuracy: true
+use_one_model_type: true
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+#planned_clusters: 1
+approximate_sampled_rows: 10000
+sampling_seed: 17
+sample_max_attempts: 5
+num_processes: 22
+index_column_name: 'Index'
+memory_logging: false
+max_unsupervised_depth: 5
+exhaustive_check_fallback: true
+excluded_attributes:
+  - "content_id"
+  - "text"
+#  - "section_title"
+#  - "breadcrumb"
+
+runtime_parameters:
+    choice_1:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 0.25
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_2:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 0.5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_3:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 1
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_4:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 2.5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_5:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_6:
+      predictor:
+        - "page_title"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 10
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+
+
+# Specifies the behavior for missing values
+handle_nulls:
+  "text":
+    method: replace_missing_value
+    replacement_value: ""
+  page_title:
+    method: replace_missing_value
+    replacement_value: ""
+  "content_id":
+    method: replace_missing_value
+    replacement_value: ""
+  "section_title":
+    method: replace_missing_value
+    replacement_value: ""
+  "breadcrumb":
+    method: replace_missing_value
+    replacement_value: ""
+
+
+# Specifies which features are used to predictors for other features
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
+predicted_by:
+  "text":
+    predictors:
+      - "page_title"
+    accuracy: 1
+    model: 'lstm'
+    clustering: supervised
+    cluster_alg: KM
+    batch_method: kd_tree_index

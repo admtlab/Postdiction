@@ -6,7 +6,11 @@ import sys
 from datetime import datetime
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+# Note this turns of GPU from TF, remove this if using lstm
+# os.environ['CUDA_VISIBLE_DEVICES'] = ''
 import tensorflow as tf
+
 import dask.dataframe as dd
 import gc
 import psutil
@@ -19,13 +23,15 @@ from config import config_get, get_column_info_table
 from big_data import data_big_with_noise
 from feature_selection import select_best_features, create_dictionary_with_predictor
 from helper import function_execution_in_milliseconds, create_file_if_not_exists, format_duration
-from train_model import train_no_cluster_outliers, train_model, train_model_unsupervised
-from batching import fit_new_batch, create_interval_index
+from train_model import train_no_cluster_outliers, train_model, train_model_unsupervised, train_model_text, \
+    multivariable_train_model, multivariable_train_model_unsupervised
+from batching import fit_new_batch, create_interval_index, multivariable_fit_new_batch
 from helper import size, append_outlier_records, get_record_size, sort_temp_file_in_chunks, merge_sorted_chunks, \
     parse_byte_size, clear_temp_dir, load_cluster_map_files, \
-    persist_cluster
+    persist_cluster, size_text
 from preprocess import free_clusters_to_best_compression
 from analysis import plot_storage_reduction
+from text import generate_corpus, vectorize_column, get_word2vec_model, vectorize_column_bin, vectorize_qwen3
 
 
 @dataclass
@@ -51,6 +57,8 @@ class RuntimeConfig:
     persist_structures: bool = False
     build_analysis: bool = False
     provide_error: bool = False
+    embed_model: str = None
+    embed_dim: int = 32
 
     @classmethod
     def from_dict(cls, parameters: dict, planned_clusters_default: int, sample_max_attempts: int):
@@ -75,7 +83,9 @@ class RuntimeConfig:
             leaf_level=parameters.get("leaf_level", 40),
             persist_structures=parameters.get("persist_structures"),
             build_analysis=parameters.get("build_analysis"),
-            provide_error=parameters.get("provide_error")
+            provide_error=parameters.get("provide_error"),
+            embed_model=parameters.get("embed_model"),
+            embed_dim=parameters.get("embed_dim")
         )
 
 
@@ -98,7 +108,7 @@ def log_memory_usage(stage: str) -> None:
         print(f"[{stage}] Memory usage: {mem_info.rss / 1024 / 1024:.2f} MB")
 
 
-def main() -> None:
+def main(planned_clusters=None) -> None:
     # load random seeds
     random.seed(100)
     np.random.seed(100)
@@ -109,6 +119,7 @@ def main() -> None:
     pd.set_option('display.width', 150)
 
     column_info_table = get_column_info_table(config_get('database'))
+    text_limit_training = config_get('text_limit_training')
 
     # check if using batched variant to read dataset (Dask)
     dask_batch_size = None
@@ -135,7 +146,8 @@ def main() -> None:
     if config_get('expand_data_multiplier') > 1:
         data = data_big_with_noise(data, config_get('expand_data_multiplier'), config_get('expanded_file_name'))
 
-    planned_clusters = config_get('planned_clusters')
+    if planned_clusters is None:
+        planned_clusters = config_get('planned_clusters')
     inlier_cluster_location = None
     data['all_zeroes'] = 0
 
@@ -166,6 +178,7 @@ def main() -> None:
 
     # Extract runtime plans from the YAML file and execute them
     for choice, parameters in runtime_parameters.items():
+        print(f"Starting: {choice} with {planned_clusters} planned clusters")
         overall_results_df = process_runtime_choice(parameters=parameters, data=data, planned_clusters=planned_clusters,
                                                     individual_run_columns=individual_run_columns,
                                                     overall_results_df=overall_results_df,
@@ -176,12 +189,6 @@ def main() -> None:
                                                     dask_batch_size=dask_batch_size,
                                                     use_global_model_type=use_global_model_type,
                                                     use_global_accuracy=use_global_accuracy)
-
-    # results_location = Path('.') / config_get('result_location') / 'analysis'
-    # timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    # results_location = results_location / timestamp
-    # create_file_if_not_exists(str(results_location))
-    # plot_storage_reduction(overall_results_df, results_location)
 
 
 def process_runtime_choice(parameters, data, planned_clusters: int, individual_run_columns: list[str],
@@ -198,9 +205,8 @@ def process_runtime_choice(parameters, data, planned_clusters: int, individual_r
 
     individual_run_df = pd.DataFrame(columns=individual_run_columns)
 
-    # -----------------------------
+    
     # Build xy_pairs
-    # -----------------------------
     if config_get('automate_feature_selection'):
         print("\n\nSelecting best Features:")
         sampling_proportion = 1 / (len(data) / 5000)
@@ -215,9 +221,8 @@ def process_runtime_choice(parameters, data, planned_clusters: int, individual_r
     else:
         xy_pairs = config_get('predicted_by')
 
-    # -----------------------------
+    
     # Process each target column
-    # -----------------------------
     for y in xy_pairs.keys():
         individual_run_df, overall_results_df = process_target_column(y=y, cfg=cfg, xy_pairs=xy_pairs, data=data,
                                                                       individual_run_df=individual_run_df,
@@ -231,7 +236,7 @@ def process_runtime_choice(parameters, data, planned_clusters: int, individual_r
                                                                       use_global_accuracy=use_global_accuracy)
 
         print(overall_results_df)
-        write_out_results(overall_results_df, individual_run_df)
+    write_out_results(overall_results_df, individual_run_df)
 
     if cfg.persist_structures:
         results_location = Path('.') / config_get('result_location')
@@ -247,18 +252,18 @@ def process_runtime_choice(parameters, data, planned_clusters: int, individual_r
 
         # Collect all temp files (one per attribute)
         temp_files = sorted(temp_dir.glob("*.tmp"))
-        record_size = get_record_size(data)
+        # record_size = get_record_size(data)
 
         # This will hold all chunk file paths
         all_chunks = []
 
         # Sort each temp file into sorted chunks
         for temp_file in temp_files:
-            chunks = sort_temp_file_in_chunks(temp_file, record_size, chunk_size_bytes=parse_byte_size(cfg.batch_size))
+            _, chunks = sort_temp_file_in_chunks(temp_file, chunk_size_bytes=parse_byte_size(cfg.batch_size))
             all_chunks.extend(chunks)
 
         # Merge all sorted chunks into the final global file
-        merge_sorted_chunks(all_chunks, final_outlier_file, record_size)
+        merge_sorted_chunks(all_chunks, final_outlier_file)
         clear_temp_dir(temp_dir)
 
         # Merge and combine cluster files
@@ -297,9 +302,9 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
     Returns updated dataframes.
     """
 
-    # -----------------------------
+    
     # Resolve model/clustering settings
-    # -----------------------------
+    
     if not use_global_model_type:
         model_type = xy_pairs[y]['model']
         clustering = xy_pairs[y]['clustering']
@@ -311,59 +316,70 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
     x_list = xy_pairs[y]['predictors'] if not config_get('use_one_predictor') else cfg.predictor
     x = x_list if cfg.model_type == 'multivariable LR' else x_list[0]
 
-    data = data.repartition(partition_size=dask_batch_size)
+    if cfg.batch_size is not None and not isinstance(data, pd.DataFrame):
+        data = data.repartition(partition_size=dask_batch_size)
 
     if cfg.model_type == 'multivariable LR':
-        raise ValueError("Multivariable LR not available in this version.")
+        x_replacement_vals = [missing_value_methods[cur_x]['replacement_value'] for cur_x in x]
     else:
         x_replacement_vals = missing_value_methods[x]['replacement_value']
 
     if not use_global_accuracy:
         accuracy = xy_pairs[y]['accuracy']
 
-    # -----------------------------
+    
     # Sample or use full dataset
-    # -----------------------------
+    
+    global_longest_string_len_x = None
+    global_longest_string_len_y = 1
     if cfg.batch_size is not None:
         if cfg.model_type == 'multivariable LR':
-            raise ValueError("Multivariable LR not available in this version.")
+            cur_data = multi_predictor_batch_sample(data, cfg.sample_max_attempts, column_index_variable, x, y,
+                                                    missing_value_methods)
         else:
+            # If sampling a string column, we need to compute the longest global length first to ensure that all vectors match
+            # Unless dimension is provided ahead of time for qwen3
+            if data.dtypes[x] == 'string' or data.dtypes[y] == 'string':
+                if cfg.embed_model == 'qwen3' and cfg.embed_dim is not None:
+                    global_longest_string_len_x = cfg.embed_dim
+                    global_longest_string_len_y = cfg.embed_dim
+                else:
+                    partition_maxes = data.map_partitions(partition_max_word_length, x)
+                    global_longest_string_len_x = partition_maxes.max().compute()
+                    partition_maxes = data.map_partitions(partition_max_word_length, y)
+                    global_longest_string_len_y = partition_maxes.max().compute()
+
             cur_data = single_predictor_batch_sample(data, cfg.sample_max_attempts, column_index_variable, x, y,
                                                      missing_value_methods)
     else:
         if cfg.model_type == 'multivariable LR':
-            raise ValueError("Multivariable LR not available in this version.")
+            cur_data = data[x + [column_index_variable, y]]
         else:
             cur_data = data[[column_index_variable, x, y]]
 
-    # -----------------------------
+    
     # Determine clusters
-    # -----------------------------
-    results, train_time = determine_clusters(cfg, individual_run_df, cur_data, x, y, x_list, column_info_table)
+    
+    results, train_time = determine_clusters(cfg, individual_run_df, cur_data, x, y, x_list, column_info_table, longest_string_len_x=global_longest_string_len_x, longest_string_len_y=global_longest_string_len_y)
     clusters = results[0]
+    x_word2vec = results[2] if data.dtypes[y] == 'string' else None
+    y_word2vec = results[3] if data.dtypes[y] == 'string' else None
 
     log_memory_usage('After determining clusters')
 
     num_outliers = 0
-    individual_run_df.at[individual_run_df.index[-1], 'time_elapsed (ms)'] = train_time
-    individual_run_df.at[individual_run_df.index[-1], 'min_split_size'] = cfg.split_size
-    individual_run_df.at[individual_run_df.index[-1], 'error_threshold'] = cfg.accuracy
-
-    # -----------------------------
+    string_data_length = 0
+    outlier_string_data_length = 0
+    
     # Partition processing
-    # -----------------------------
     if cfg.batch_size is not None:
-        if cfg.batch_method == 'kd_tree_index':
-            assert cfg.model_type == 'multivariable LR'
-            raise ValueError("Multivariable LR not available in this version.")
-
         x_index, y_index, kd_index = create_interval_index(cfg.batch_method, cur_data, clusters, x, cfg.accuracy,
                                                            leaf_level=cfg.leaf_level)
 
         log_memory_usage('After computing indexes')
 
         for cur_partition_num in tqdm(range(data.npartitions), desc="Processing partitions", ascii=' =', leave=False):
-            outlier_values, holder, fitting_time, outliers_found, cluster_tuple_lst, outlier_errors, inlier_errors = process_partition(
+            outlier_values, holder, fitting_time, outliers_found, cluster_tuple_lst, outlier_errors, inlier_errors, str_data_len, str_outlier_len = process_partition(
                 data=data, cur_partition_num=cur_partition_num,
                 cfg=cfg, x=x, y=y,
                 column_index_variable=column_index_variable,
@@ -371,9 +387,13 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
                 kd_index=kd_index, clusters=clusters,
                 inlier_cluster_location=inlier_cluster_location,
                 missing_value_methods=missing_value_methods,
-                x_replacement_vals=x_replacement_vals)
+                x_replacement_vals=x_replacement_vals, x_word2vec_model=x_word2vec, y_word2vec_model=y_word2vec,
+                global_longest_string_len_x=global_longest_string_len_x, global_longest_string_len_y=global_longest_string_len_y,
+            )
 
             num_outliers += outliers_found
+            string_data_length += str_data_len
+            outlier_string_data_length += str_outlier_len
 
             # Write errors to file for later eval
             if cfg.build_analysis:
@@ -422,24 +442,57 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
             if (cur_partition_num + 1) % 10 == 0:
                 gc.collect()
 
+            # Write word2vec models if relevant
+            if not cfg.binary and cur_partition_num == data.npartitions - 1:
+                if x_word2vec is not None:
+                    path = f"models/{x}_word2vec_model.model"
+                    os.makedirs("models", exist_ok=True)
+                    x_word2vec.save(path)
+
+                if y_word2vec is not None:
+                    path = f"models/{y}_word2vec_model.model"
+                    os.makedirs("models", exist_ok=True)
+                    y_word2vec.save(path)
+
     log_memory_usage('After processing partitions')
 
-    # -----------------------------
+    
     # Postprocessing
-    # -----------------------------
+    
     postprocess_time = 0
-    if cfg.postprocess_data:
-        [clusters, new_num_outliers], postprocess_time = function_execution_in_milliseconds(
-            free_clusters_to_best_compression, clusters, num_outliers, data.dtypes[y], len(data),
-            Path('.') / config_get('result_location') / 'outliers.txt', y)
-        num_outliers = new_num_outliers
-        individual_run_df.at[individual_run_df.index[-1], 'num_clusters'] = len(clusters)
-
-    # -----------------------------
-    # Size stats
-    # -----------------------------
     datatype_of_predicted = data.dtypes[y]
-    size_stats = size(len(clusters), num_outliers, datatype_of_predicted, len(data), y, predicting_feature_count=len(x))
+    if data.dtypes[y] == 'string[pyarrow]' or data.dtypes[y] == 'str' or data.dtypes[y] == 'string':
+        if cfg.binary:
+            datatype_of_predicted = f'S{global_longest_string_len_y}'
+
+    if cfg.postprocess_data:
+        word2vec_model_name = f"models/{y}_word2vec_model.model" if cfg.embed_model == 'word2vec' else None
+        [clusters, new_num_outliers], postprocess_time = function_execution_in_milliseconds(
+            free_clusters_to_best_compression, clusters, num_outliers, datatype_of_predicted, len(data),
+            Path('.') / config_get('result_location') / 'outliers.txt', y, word2vec_model_name, x_vec_max_len=global_longest_string_len_x, y_vec_max_len=global_longest_string_len_y, binary=cfg.binary)
+        num_outliers = new_num_outliers
+
+    
+    # Size stats
+    if (datatype_of_predicted == 'string[pyarrow]' or datatype_of_predicted == 'str') and not cfg.binary:
+        word2vec_model_name = f"models/{y}_word2vec_model.model" if cfg.embed_model == 'word2vec' else None
+        size_stats = size_text(len(clusters), outlier_string_data_length, len(data), string_data_length, word2vec_model_name, x_vector_len=global_longest_string_len_x)
+    else:
+        size_stats = size(len(clusters), num_outliers, datatype_of_predicted, len(data), y, predicting_feature_count=len(x))
+
+    new_row = {
+        'predicting_feature': x,
+        'predicted_feature': y,
+        'ml_method': cfg.model_type,
+        'clustering_method': cfg.cluster_alg,
+        'num_clusters': len(clusters),
+        'num_outliers': num_outliers,
+        'size (bytes)': str(size_stats[0]),
+        'original_size (bytes)': str(size_stats[1]),
+        'percentage_of_original_size': f"{size_stats[2]}%"
+    }
+
+    individual_run_df.loc[len(individual_run_df)] = new_row
 
     individual_run_df.at[individual_run_df.index[-1], 'time_elapsed (ms)'] = (
             train_time + postprocess_time
@@ -452,19 +505,21 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
     individual_run_df.at[individual_run_df.index[-1], 'outlier_size (bytes)'] = size_stats[4]
     individual_run_df.at[individual_run_df.index[-1], 'original_bits'] = size_stats[5]
     individual_run_df.at[individual_run_df.index[-1], 'bits'] = size_stats[6]
+    individual_run_df.loc[individual_run_df.index[-1], 'error_threshold'] = cfg.accuracy
+    individual_run_df.loc[individual_run_df.index[-1], 'min_split_size'] =  cfg.split_size
 
-    # -----------------------------
+    
     # Aggregate results
-    # -----------------------------
+    
     compressed_size = individual_run_df['size (bytes)'].astype(int).sum()
     original_size = individual_run_df['original_size (bytes)'].astype(int).sum()
     percentage = (compressed_size / original_size) * 100
     models_size = individual_run_df['models_size (bytes)'].astype(int).sum()
     outliers_size = individual_run_df['outlier_size (bytes)'].astype(int).sum()
 
-    # -----------------------------
+    
     # Error Results
-    # -----------------------------
+    
     if cfg.provide_error:
         outlier_ddf = dd.read_parquet(Path('.') / config_get('result_location') / 'errors' / f"{y}" / "outliers", engine="pyarrow")
         out_stats = outlier_ddf.describe(include="all").compute()
@@ -522,9 +577,9 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
         create_file_if_not_exists(cluster_model_path)
         persist_cluster(clusters, cluster_model_path, cfg.model_type, x, y, cfg.batch_size)
 
-    # -----------------------------
+    
     # Cleanup
-    # -----------------------------
+    
     for var in ['x_index', 'y_index', 'kd_index', 'clusters', 'holder']:
         if var in locals():
             del locals()[var]
@@ -545,19 +600,55 @@ def process_target_column(y: str, cfg: RuntimeConfig, xy_pairs, data, individual
     return individual_run_df, overall_results_df
 
 
-def determine_clusters(cfg: RuntimeConfig, individual_run_df: pd.DataFrame, cur_data, x, y, x_list, column_info_table):
+def partition_max_word_length(df, feature, binary=False):
+    if not binary:
+        corpus = generate_corpus(df, feature)
+
+        # Compute max token length in a single streaming pass
+        max_length = 0
+        for tokens in corpus:
+            if len(tokens) > max_length:
+                max_length = len(tokens)
+    else:
+        max_length = 0
+        for index, row in df.iterrows():
+            byte_len = len(row[feature].encode("utf-8", errors="backslashreplace"))
+            if byte_len > max_length:
+                max_length = byte_len
+
+    return max_length
+
+
+
+
+def determine_clusters(cfg: RuntimeConfig, individual_run_df: pd.DataFrame, cur_data, x, y, x_list, column_info_table, longest_string_len_x=None, longest_string_len_y=1):
     """
     Determine clusters and return (results, train_time).
     """
 
     # Multivariable branch
     if cfg.model_type == 'multivariable LR':
-        raise ValueError("Multivariable LR not available in this version.")
+        if cfg.clustering == "supervised":
+            return function_execution_in_milliseconds(multivariable_train_model, individual_run_df, cur_data, x, y,
+                                                      cfg.cluster_alg, cfg.outlier_before, cfg.outlier_after,
+                                                      cfg.accuracy_tuning, cfg.accuracy, cfg.planned_clusters,
+                                                      model_type=cfg.model_type)
+        elif cfg.clustering == "unsupervised":
+            return function_execution_in_milliseconds(multivariable_train_model_unsupervised, individual_run_df,
+                                                      cur_data, x, y, cfg.cluster_alg, cfg.accuracy, cfg.split_size,
+                                                      cfg.preprocess_data, model_type=cfg.model_type)
+        else:
+            raise ValueError("Multivariable textual training without clusters/outlier detection is not supported")
     # Non-multivariable branch
     else:
         # Text model case
-        if x_list[0] != 'all_zeroes' and column_info_table[x][0] == 'string' and column_info_table[y][0] == 'string':
-            raise ValueError("Textual Data not available in this version.")
+        if x_list[0] != 'all_zeroes' and (column_info_table[x][0] == 'string' or column_info_table[y][0] == 'string'):
+            accuracy = cfg.accuracy if cfg.accuracy else 0.95
+            binary = cfg.binary if cfg.binary else False
+            return function_execution_in_milliseconds(train_model_text, individual_run_df, cur_data, x, y,
+                                                      cfg.planned_clusters, cfg.vector_size,
+                                                      acceptable_threshold=accuracy, binary=binary,
+                                                      model_type=cfg.model_type, longest_string_length_x=longest_string_len_x, longest_string_length_y=longest_string_len_y, clustering_method=cfg.cluster_alg, min_split_size=cfg.split_size, embed_model=cfg.embed_model, embed_dim=cfg.embed_dim)
         # Supervised clustering
         elif cfg.clustering == "supervised":
             return function_execution_in_milliseconds(train_model, individual_run_df, cur_data, x, y, cfg.cluster_alg,
@@ -576,18 +667,61 @@ def determine_clusters(cfg: RuntimeConfig, individual_run_df: pd.DataFrame, cur_
 
 def process_partition(data, cur_partition_num: int, cfg: RuntimeConfig, x: list[str] | str, y: str,
                       column_index_variable: str, x_index, y_index, kd_index, clusters,
-                      inlier_cluster_location, missing_value_methods, x_replacement_vals
+                      inlier_cluster_location, missing_value_methods, x_replacement_vals, x_word2vec_model, y_word2vec_model, global_longest_string_len_x, global_longest_string_len_y
                       ):
     """
     Process a single partition using specified indexes and returns (holder, fitting_time, num_outliers).
     """
-
     # Select columns depending on model type
+    str_data_length = 0
+    str_outlier_length = 0
     if cfg.model_type == 'multivariable LR':
-        raise ValueError("Multivariable LR not available in this version.")
+        col_display_lst = x + [column_index_variable, y]
+        cur_batch = data.get_partition(cur_partition_num)[col_display_lst].compute()
+
+        holder, fitting_time = function_execution_in_milliseconds(
+            multivariable_fit_new_batch,
+            cur_batch,
+            cfg.batch_method,
+            clusters,
+            x,
+            y,
+            x_index,
+            y_index,
+            kd_index,
+            cfg.accuracy,
+            clustering_destination=inlier_cluster_location,
+            cur_partition_num=cur_partition_num,
+            model_type=cfg.model_type,
+            null_method=missing_value_methods[y]['method'],
+            replacement_x=x_replacement_vals,
+            replacement_y=missing_value_methods[y]['replacement_value'],
+        )
 
     else:
         cur_batch = data.get_partition(cur_partition_num)[[column_index_variable, x, y]].compute()
+
+        if data.dtypes[y] == 'string':
+            print(f"Converting {y} from string")
+            if cfg.binary:
+                cur_batch = vectorize_column_bin(cur_batch, y, global_longest_string_len_y)
+            else:
+                if cfg.embed_model == 'word2vec':
+                    y_word2vec_model, _ = get_word2vec_model(cur_batch, y, cfg.vector_size, existing_model=y_word2vec_model)
+                    cur_batch, _ = vectorize_column(cur_batch, y, y_word2vec_model, cfg.vector_size, global_longest_string_len_y)
+                elif cfg.embed_model == 'qwen3':
+                    cur_batch = vectorize_qwen3(cur_batch, y, cfg.embed_dim)
+                str_data_length = sum(len(s) for s in cur_batch[y])
+        if data.dtypes[x] == 'string':
+            print(f"Converting {x} from string")
+            if cfg.binary:
+                cur_batch = vectorize_column_bin(cur_batch, x, global_longest_string_len_x)
+            else:
+                if cfg.embed_model == 'word2vec':
+                    x_word2vec_model, _ = get_word2vec_model(cur_batch, x, cfg.vector_size, existing_model=x_word2vec_model)
+                    cur_batch, _ = vectorize_column(cur_batch, x, x_word2vec_model, cfg.vector_size, global_longest_string_len_x)
+                elif cfg.embed_model == 'qwen3':
+                    cur_batch = vectorize_qwen3(cur_batch, x, cfg.embed_dim)
 
         holder, fitting_time = function_execution_in_milliseconds(
             fit_new_batch,
@@ -598,6 +732,7 @@ def process_partition(data, cur_partition_num: int, cfg: RuntimeConfig, x: list[
             y,
             x_index,
             y_index,
+            kd_index,
             cfg.accuracy,
             clustering_destination=inlier_cluster_location,
             cur_partition_num=cur_partition_num,
@@ -608,17 +743,26 @@ def process_partition(data, cur_partition_num: int, cfg: RuntimeConfig, x: list[
             provide_error=cfg.provide_error
         )
 
+        if data.dtypes[y] == 'string' and not cfg.binary:
+            cur_batch_outliers = cur_batch[cur_batch[column_index_variable].isin(holder[0])]
+            str_outlier_length = sum(len(s) for s in cur_batch_outliers[y])
+
     holder_outliers = holder[0]
     holder_clustered = holder[1]
-    holder_outlier_errors = holder[2]
-    holder_inlier_errors = holder[3]
+
+    if cfg.model_type == 'multivariable LR':
+        holder_outlier_errors = []
+        holder_inlier_errors = []
+    else:
+        holder_outlier_errors = holder[2]
+        holder_inlier_errors = holder[3]
     num_outliers = len(holder_outliers)
     outlier_values = (cur_batch[cur_batch[column_index_variable].isin(holder_outliers)])[y].tolist()
 
     # Cleanup
     del cur_batch
 
-    return outlier_values, holder_outliers, fitting_time, num_outliers, holder_clustered, holder_outlier_errors, holder_inlier_errors
+    return outlier_values, holder_outliers, fitting_time, num_outliers, holder_clustered, holder_outlier_errors, holder_inlier_errors, str_data_length, str_outlier_length
 
 
 def write_out_results(overall_results_df: pd.DataFrame, individual_run_df: pd.DataFrame) -> None:
@@ -765,5 +909,11 @@ def multi_predictor_batch_sample(data, sample_max_attempts, column_index_variabl
 
 
 if __name__ == "__main__":
-    _, millis = function_execution_in_milliseconds(main)
-    print(f"Total time: {format_duration(millis)}")
+    clear_temp_dir(Path('.') / config_get('result_location'))
+    clear_temp_dir(Path('.') / 'models')
+    planned_cluster_amounts = [1, 2, 4, 8]
+    # planned_cluster_amounts = [4, 8]
+    # planned_cluster_amounts = [1]
+    for planned_cluster_amount in planned_cluster_amounts:
+        _, millis = function_execution_in_milliseconds(main, planned_cluster_amount)
+        print(f"Total time for {planned_cluster_amount} clusters: {format_duration(millis)}")

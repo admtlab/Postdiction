@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
@@ -14,14 +14,14 @@ column_index_variable = config_get('index_column_name')
 
 #################################################### Clustering
 
-def k_means(data_file: pd.DataFrame, numClusters: int, x_label: str, y_label: str, binary=False) -> list:
+def k_means(data_file: pd.DataFrame, numClusters: int, x_label: str, y_label: str, binary=False) -> tuple:
     x = data_file[x_label]
     y = data_file[y_label]
 
     data = []
     if binary:
         for i in range(len(x)):
-            data.append(x[i] + y[i])
+            data.append(x[i].tolist() + y[i].tolist())
     else:
         data = list(zip(x, y))
 
@@ -56,7 +56,7 @@ def k_means(data_file: pd.DataFrame, numClusters: int, x_label: str, y_label: st
         cluster = copied_data[copied_data['Cluster'] == i]
         cluster_list.append(cluster)
 
-    return cluster_list
+    return cluster_list, kmeans.cluster_centers_
 
 
 # Method for distribution clustering
@@ -69,14 +69,14 @@ def distribution(data: pd.DataFrame, num_clusters: int, x_label: str, y_label: s
 
     labels = gmm.predict(X)
 
-    fig, axs = plt.subplots(1, num_clusters, figsize=(5 * num_clusters, 5))
+    # fig, axs = plt.subplots(1, num_clusters, figsize=(5 * num_clusters, 5))
     clusters = []
     for i in range(num_clusters):
         cluster = X[labels == i]
-        axs[i].scatter(cluster[:, 0], cluster[:, 1], c='b')
-        axs[i].set_xlabel(x_label)
-        axs[i].set_ylabel(y_label)
-        axs[i].set_title(f'Cluster {i + 1}')
+        # axs[i].scatter(cluster[:, 0], cluster[:, 1], c='b')
+        # axs[i].set_xlabel(x_label)
+        # axs[i].set_ylabel(y_label)
+        # axs[i].set_title(f'Cluster {i + 1}')
 
         # convert array back to a dataframe
         dataset = pd.DataFrame({column_index_variable: cluster[:, 0], x_label: cluster[:, 1], y_label: cluster[:, 2]})
@@ -87,6 +87,7 @@ def distribution(data: pd.DataFrame, num_clusters: int, x_label: str, y_label: s
     return clusters
 
 
+# DB scan is inefficient and works
 # Better for outlier detection, not clustering
 def db_scan(data, input, x_label, y_label):
     nbrs = NearestNeighbors(n_neighbors=5).fit(data)
@@ -164,3 +165,75 @@ def bisecting_kmeans(data_file: pd.DataFrame, numClusters: int, x_label: str, y_
         cluster_list.append(cluster)
 
     return cluster_list
+
+
+def multivariable_k_means(data_file: pd.DataFrame, numClusters: int, x_label: list[str], y_label: str, binary=False) -> list:
+    x = data_file[x_label]
+    # print(f"{x}")
+    y = data_file[y_label]
+
+    data = []
+    if binary:
+        for i in range(len(x)):
+            data.append(x[i] + y[i])
+    else:
+        data = list(zip(x, y))
+
+    try:
+        x_sub = x[0]
+        y_sub = y[0]
+    except KeyError:
+        x_sub = None
+        y_sub = None
+
+    # if isinstance(x, pd.core.series.Series) and isinstance(x_sub, np.ndarray) and isinstance(y,
+    #                                                                                          pd.core.series.Series) and isinstance(
+    #         y_sub, np.ndarray):
+    #     adjusted_data = []
+    #     for i in range(len(x)):
+    #         adjusted_data.append(list(x[i]) + list(y[i]))
+    #     data = adjusted_data
+
+    adjusted_data = []
+    for i in range(len(x)):
+        current_row = []
+        for cur_x_label in x_label:
+            current_row.append(x[cur_x_label][i])
+        adjusted_data.append(current_row + [y[i]])
+    data = adjusted_data
+
+    # actually run algorithm
+    kmeans = KMeans(n_clusters=numClusters)
+    # print(f"{data}")
+    kmeans.fit(data)
+
+    # Create a DataFrame with the original data and cluster labels
+    copied_data = data_file.copy()
+    copied_data['Cluster'] = kmeans.labels_
+
+    # Create a list of clusters
+    cluster_list = []
+    # Create a new DataFrame for each cluster
+    for i in range(numClusters):
+        # create a scatter plot for each cluster
+        cluster = copied_data[copied_data['Cluster'] == i]
+        cluster_list.append(cluster)
+
+    return cluster_list
+
+
+def multivariable_minhal_split(data_file: pd.DataFrame, model, x_label: list[str], y_label: str, binary=False) -> list:
+    """
+    Basic regression-based clustering that splits data into 2 clusters
+    based on points above/below regression line.
+    """
+    x = data_file[x_label].values
+    y = data_file[y_label].values
+
+    predicted_y = model.predict(x)
+
+    # Split into 2 clusters: points above and below the line
+    cluster1 = data_file[y > predicted_y].copy()
+    cluster2 = data_file[y <= predicted_y].copy()
+
+    return [cluster1, cluster2]

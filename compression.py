@@ -26,7 +26,6 @@ tolerance = 1e-2
 
 def compression_wrapper(data: pd.DataFrame, method: str, compressed_columns: list[str], write_to_file=True) -> tuple[
     float, float, float, float, float]:
-
     original_size = sys.getsizeof(df_to_bytes(data))
 
     if method == 'sz' or method == 'zfp':
@@ -51,6 +50,7 @@ def compression_wrapper(data: pd.DataFrame, method: str, compressed_columns: lis
 
             if method == 'sz':
                 compressed_size += compressed_data.size
+                # print(f"sz: {compressed_size}, {sys.getsizeof(pd.DataFrame({cur_col: compressed_data}))}")
             else:
                 compressed_size += sys.getsizeof(compressed_data)
             decompressed_size += sys.getsizeof(decompressed_data)
@@ -98,6 +98,7 @@ def compression_wrapper(data: pd.DataFrame, method: str, compressed_columns: lis
                                                              'outliers_min_error': outliers_min_error,
                                                              'outliers_max_error': outliers_max_error,
                                                              'outliers_stdev_error': outliers_stdev_error}
+            # print(f'Inliers: {len(inliers_table)}, Outliers: {len(outliers_table)}')
         print(error_rslts_table)
         if write_to_file:
             results_location = Path('.') / 'results' / 'compression' / 'error_results.csv'

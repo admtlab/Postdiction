@@ -1,7 +1,7 @@
 database: "archive/djp_generated_data/gaussian.parquet"
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: "linear_regression"
+machine_learning_model: 'linear_regression'
 automate_feature_selection: false
 use_one_predictor: false
 expand_data_multiplier: 0
@@ -13,13 +13,66 @@ sampling_seed: 17
 sample_max_attempts: 5
 
 runtime_parameters:
-  choice_2:
-    predictor: employeeID
-    clustering: unsupervised
-    cluster_alg: Minhal
-    accuracy: 1
-    split_size: 4
-    preprocess_data: false
-    postprocess_data: true
-    batch_size: "256MB"
-    batch_method: array_index
+#    choice_0:
+#        predictor: employeeID
+#        clustering: unsupervised
+#        cluster_alg: Minhal
+#        accuracy: 0.25
+#        split_size: 4
+#        preprocess_data: false
+#        postprocess_data: true
+#        batch_size: "256MB"
+#        batch_method: array_index
+#    choice_1:
+#        predictor: employeeID
+#        clustering: unsupervised
+#        cluster_alg: Minhal
+#        accuracy: 0.5
+#        split_size: 4
+#        preprocess_data: false
+#        postprocess_data: true
+#        batch_size: "256MB"
+#        batch_method: array_index
+    choice_2:
+        predictor: employeeID
+        clustering: unsupervised
+        cluster_alg: Minhal
+        accuracy: 1
+        split_size: 4
+        preprocess_data: false
+        postprocess_data: true
+        batch_size: "256MB"
+        batch_method: array_index
+#    choice_3:
+#        predictor: employeeID
+#        clustering: unsupervised
+#        cluster_alg: Minhal
+#        accuracy: 2.5
+#        split_size: 4
+#        preprocess_data: false
+#        postprocess_data: true
+#        batch_size: "256MB"
+#        batch_method: array_index
+#    choice_4:
+#        predictor: employeeID
+#        clustering: unsupervised
+#        cluster_alg: Minhal
+#        accuracy: 5
+#        split_size: 4
+#        preprocess_data: false
+#        postprocess_data: true
+#        batch_size: "256MB"
+#        batch_method: array_index
+
+# Specifies which features are used to predictors for other features
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
+predicted_by:
+  "age":
+    - "employeeID"
+  "salary":
+    - "employeeID"
+  "yearsOfExperience":
+    - "employeeID"
+  "firstYearAtCompany":
+    - "employeeID"

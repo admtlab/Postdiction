@@ -1,0 +1,185 @@
+database: "archive/winemag-data-130k-v2.parquet"
+result_location: "results/"
+outlier_detection_technique: "combo"
+machine_learning_model: 'lstm'
+automate_feature_selection: false
+use_one_predictor: true
+use_global_accuracy: true
+use_one_model_type: true
+expand_data_multiplier: 0
+expanded_file_name: null
+full_accuracy: false
+#planned_clusters: 2
+approximate_sampled_rows: 100
+sampling_seed: 17
+sample_max_attempts: 5
+num_processes: 22
+index_column_name: 'Index'
+memory_logging: false
+max_unsupervised_depth: 1000
+exhaustive_check_fallback: true
+excluded_attributes:
+  - "points"
+
+runtime_parameters:
+    choice_1:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 0.25
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_2:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 0.5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_3:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 1
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_4:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 2.5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_5:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 5
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+    choice_6:
+      predictor:
+        - "winery"
+      clustering: supervised
+      cluster_alg: KM
+      machine_learning_model: 'lstm'
+      accuracy: 10
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "32MB"
+      batch_method: kd_tree_index
+      persist_structures: false
+      build_analysis: false
+      provide_error: false
+      binary: false
+      embed_model: "qwen3"
+      embed_dim: 32
+
+
+
+# Specifies the behavior for missing values
+handle_nulls:
+  "title":
+    method: replace_missing_value
+    replacement_value: ""
+  description:
+    method: replace_missing_value
+    replacement_value: ""
+  "country":
+    method: replace_missing_value
+    replacement_value: ""
+  "designation":
+    method: replace_missing_value
+    replacement_value: ""
+  "province":
+    method: replace_missing_value
+    replacement_value: ""
+  "region_1":
+    method: replace_missing_value
+    replacement_value: ""
+  "region_2":
+    method: replace_missing_value
+    replacement_value: ""
+  "taster_name":
+    method: replace_missing_value
+    replacement_value: ""
+  "taster_twitter_handle":
+    method: replace_missing_value
+    replacement_value: ""
+  "variety":
+    method: replace_missing_value
+    replacement_value: ""
+  "winery":
+    method: replace_missing_value
+    replacement_value: ""
+
+
+# Specifies which features are used to predictors for other features
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
+predicted_by:
+  "description":
+    predictors:
+      - "title"
+    accuracy: 10
+    model: 'lstm'
+    clustering: supervised
+    cluster_alg: KM
+    batch_method: array_index
+    planned_clusters: 100

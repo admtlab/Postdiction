@@ -10,35 +10,52 @@ import statistics
 
 from numpy.core.numeric import NaN
 from sklearn.neighbors import KDTree
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 import models
 from helper import list_of_percent_differences
 from models import Cluster
-from multiprocessing import Pool, Lock
+from multiprocessing import Pool, Lock, Value
 from config import config_get
+from text import cosine_similarity
 
 clusters_lock = Lock()
+file_case_study = Lock()
+case_study_counter = Value('i', 0)
 column_index_variable = config_get('index_column_name')
+use_exhaustive_fallback = config_get('exhaustive_check_fallback')
 
 
 def row_in_cluster(x_value, y_value, index, batch_method: str, sorted_clusters: list[models.Cluster], x_tree: np.array,
-                   y_tree: list,
-                   error_tolerance: float, model_type: str, null_method: str, replacement_x, replacement_y, provide_error=False):
+                   y_tree: list, kd_tree,
+                   error_tolerance: float, model_type: str, null_method: str, replacement_x, replacement_y,
+                   provide_error=False):
     is_outlier = False
     cluster_id = 0  # 0 is a special value for outliers. All other indexes will be +1
     prediction_error = 0
     interval_check_start = time.time()
 
     # Edge case for null values
-    if null_method == 'outliers' and pd.isnull(x_value) or pd.isnull(y_value):
-        # Remove nulls as outliers
-        interval_check_end = time.time()
-        return interval_check_end - interval_check_start, index, True, cluster_id, prediction_error
-    elif null_method == 'replace_missing_value' and pd.isnull(x_value) or pd.isnull(y_value):
-        # Replace null values with a specified value
-        x_value = replacement_x
-        y_value = replacement_y
-
+    if null_method == 'outliers':
+        if hasattr(x_value, '__len__') or hasattr(y_value, '__len__'):
+            if pd.isnull(x_value.any()) or pd.isnull(y_value.any()):
+                # Remove nulls as outliers
+                interval_check_end = time.time()
+                return interval_check_end - interval_check_start, index, True, cluster_id, prediction_error
+        elif pd.isnull(x_value) or pd.isnull(y_value):
+            # Remove nulls as outliers
+            interval_check_end = time.time()
+            return interval_check_end - interval_check_start, index, True, cluster_id, prediction_error
+    elif null_method == 'replace_missing_value':
+        if hasattr(x_value, '__len__') or hasattr(y_value, '__len__'):
+            if pd.isnull(x_value.any()) or pd.isnull(y_value.any()):
+                # Replace null values with a specified value
+                x_value = replacement_x
+                y_value = replacement_y
+        elif pd.isnull(x_value) or pd.isnull(y_value):
+            # Replace null values with a specified value
+            x_value = replacement_x
+            y_value = replacement_y
     if batch_method == "binary_search":
         found_value, cluster_index = value_exists_in_cluster(sorted_clusters, x_value, y_value, error_tolerance, index)
         if not found_value:
@@ -52,17 +69,115 @@ def row_in_cluster(x_value, y_value, index, batch_method: str, sorted_clusters: 
         else:
             cluster_id = cluster_index
     elif batch_method == "array_index":
-        found_value, cluster_index, predicted_error = interval_index_check_array(x_value, y_value, error_tolerance, index, x_tree, y_tree, provide_error=provide_error, model_type=model_type)
+        prechecked_clusters = []
+        found_value, cluster_index, predicted_error, prechecked_clusters = interval_index_check_array(x_value, y_value,
+                                                                                                      error_tolerance,
+                                                                                                      index, x_tree,
+                                                                                                      y_tree,
+                                                                                                      provide_error=provide_error,
+                                                                                                      model_type=model_type)
+
+        if use_exhaustive_fallback and not found_value:
+            # Remove previously checked clusters
+            sorted_clusters = list(filter(lambda tmp_cluster: tmp_cluster.cluster_index not in prechecked_clusters,
+                                          sorted_clusters))
+
+            for cluster in sorted_clusters:
+                found_value, _, predicted_error = check_model_within_threshold(cluster, x_value, y_value,
+                                                                               error_tolerance,
+                                                                               model_type=model_type,
+                                                                               provide_error=provide_error)
+                if found_value:
+                    cluster_id = cluster.cluster_index
+                    break
+
         if not found_value:
             is_outlier = True
         else:
             cluster_id = cluster_index
             prediction_error = predicted_error
+    elif batch_method == "kd_tree_index":
+        try:
+            if not isinstance(x_value, list):
+                x_value = x_value.tolist()
+        except AttributeError:
+            pass
+        try:
+            if not isinstance(y_value, list):
+                y_value = y_value.reshape(-1).tolist()
+        except AttributeError:
+            pass
+
+        if not isinstance(x_value, list) and not isinstance(y_value, list):
+            values_to_check = np.array([x_value] + [y_value]).reshape(1, -1)
+        else:
+            values_to_check = np.array(x_value + y_value).reshape(1, -1)
+        # Find nearest half of clusters to check, sort by least Minkowski distance
+        is_in_cluster = False
+
+        # Maintain cluster indexes checked by kd-tree. Small optimization if having to utilize exhaustive search
+        prechecked_clusters = []
+        if len(sorted_clusters) > 1:
+            dist, ind = kd_tree.query(values_to_check, k=(len(sorted_clusters) // 2))
+            for cluster_index in ind.tolist():
+                cluster_to_check = sorted_clusters[cluster_index[0]]
+                is_in_cluster, predicted_val, predicted_error = check_model_within_threshold(cluster_to_check, x_value, y_value,
+                                                                                 error_tolerance,
+                                                                                 model_type=model_type,
+                                                                                 provide_error=provide_error)
+
+                if is_in_cluster:
+                    cluster_id = cluster_to_check.cluster_index
+                    break
+                prechecked_clusters.append(cluster_index)
+
+        # If kd clusters do not match, do exhaustive check. Prioritize storage over speed
+        if (use_exhaustive_fallback and not is_in_cluster) or (len(sorted_clusters) <= 1):
+            is_in_cluster = False
+            # Remove previously checked clusters
+            sorted_clusters = list(filter(lambda tmp_cluster: tmp_cluster.cluster_index not in prechecked_clusters,
+                                          sorted_clusters))
+            for cluster in sorted_clusters:
+                is_in_cluster, predicted_val, predicted_error = check_model_within_threshold(cluster, x_value, y_value,
+                                                                                 error_tolerance,
+                                                                                 model_type=model_type,
+                                                                                 provide_error=provide_error)
+                if is_in_cluster:
+                    cluster_id = cluster.cluster_index
+                    # # Decode and print the first 10 rows to reach this point
+                    # with case_study_counter.get_lock():
+                    #     current_count = case_study_counter.value
+                    #     if current_count < 10:
+                    #         case_study_counter.value += 1
+                    #         should_log = True
+                    #     else:
+                    #         should_log = False
+                    #
+                    # if should_log:
+                    #     val_to_display = []
+                    #     for predicted_int in predicted_val:
+                    #         predicted_sequence = int(predicted_int).to_bytes(
+                    #             length=((int(predicted_int).bit_length() + 7) // 8),
+                    #             byteorder='big', signed=False
+                    #         )
+                    #         predicted_dec = predicted_sequence.decode(encoding='utf-8', errors='backslashreplace')
+                    #         val_to_display.append(predicted_dec)
+                    #     file_case_study.acquire()
+                    #     try:
+                    #         with open("case_study.txt", "a") as case_file:
+                    #             case_file.write(f"Decoded string for index {index} is: {val_to_display}\n")
+                    #     finally:
+                    #         file_case_study.release()
+                    break
+
+        if not is_in_cluster:
+            is_outlier = True
     elif batch_method == "exhaustive_search":
         is_in_cluster = False
         for cluster in sorted_clusters:
             is_in_cluster, _, predicted_error = check_model_within_threshold(cluster, x_value, y_value, error_tolerance,
-                                                            model_type=model_type, provide_error=provide_error)
+                                                                             model_type=model_type,
+                                                                             provide_error=provide_error)
             if is_in_cluster:
                 cluster_id = cluster.cluster_index
                 prediction_error = predicted_error
@@ -77,6 +192,100 @@ def row_in_cluster(x_value, y_value, index, batch_method: str, sorted_clusters: 
     return interval_check_end - interval_check_start, index, is_outlier, cluster_id, prediction_error
 
 
+def multivariable_row_in_cluster(x_values, y_value, index, batch_method: str, sorted_clusters: list[models.Cluster],
+                                 x_tree: np.array,
+                                 y_tree: list, kd_tree,
+                                 error_tolerance: float, model_type: str, null_method: str, replacement_x: list,
+                                 replacement_y):
+    assert model_type == 'multivariable LR'
+
+    is_outlier = False
+    cluster_id = 0  # 0 is a special value for outliers
+    interval_check_start = time.time()
+
+    # Edge case for null values
+    if null_method == 'outliers':
+        # and pd.isnull(x_value) or pd.isnull(y_value):
+        if pd.isnull(y_value):
+            # Remove nulls as outliers
+            interval_check_end = time.time()
+            return interval_check_end - interval_check_start, index, True
+
+        for cur_x_val in x_values:
+            if pd.isnull(cur_x_val):
+                # Remove nulls as outliers
+                interval_check_end = time.time()
+                return interval_check_end - interval_check_start, index, True
+
+        # If here, no missing values to treat this row immediately as an outlier
+    elif null_method == 'replace_missing_value':
+        # and pd.isnull(x_value) or pd.isnull(y_value):
+        if pd.isnull(y_value):
+            y_value = replacement_y
+
+        for cur_x_val, j in enumerate(x_values):
+            if pd.isnull(cur_x_val):
+                x_values[j] = replacement_x[j]
+
+    if batch_method == "binary_search":
+        raise ValueError('Not currently supported in multivariable setup')
+    elif batch_method == "tree_index":
+        raise ValueError('Not currently supported in multivariable setup')
+    elif batch_method == "array_index":
+        raise ValueError('Not currently supported in multivariable setup')
+    elif batch_method == "exhaustive_search":
+        is_in_cluster = False
+        for cluster in sorted_clusters:
+            is_in_cluster, _ = multivariable_check_model_within_threshold(cluster, x_values, y_value, error_tolerance,
+                                                                          model_type=model_type)
+            if is_in_cluster:
+                cluster_id = cluster.cluster_index
+                break
+
+        if not is_in_cluster:
+            is_outlier = True
+    elif batch_method == "kd_tree_index":
+        values_to_check = np.array(x_values + [y_value]).reshape(1, -1)
+        # Find nearest half of clusters to check, sort by least Minkowski distance
+        is_in_cluster = False
+
+        # Maintain cluster indexes checked by kd-tree. Small optimization if having to utilize exhaustive search
+        # raise ValueError(f'batched: {len(values_to_check[0])}')
+        prechecked_clusters = []
+        if len(sorted_clusters) > 1:
+            dist, ind = kd_tree.query(values_to_check, k=(len(sorted_clusters) // 2))
+            for cluster_index in ind.tolist():
+                cluster_to_check = sorted_clusters[cluster_index[0]]
+                is_in_cluster, _ = multivariable_check_model_within_threshold(cluster_to_check, x_values, y_value,
+                                                                              error_tolerance, model_type=model_type)
+
+                if is_in_cluster:
+                    cluster_id = cluster_to_check.cluster_index
+                    break
+                prechecked_clusters.append(cluster_index)
+
+        # If kd clusters do not match, do exhaustive check. Prioritize storage over speed
+        if (use_exhaustive_fallback and not is_in_cluster) or (len(sorted_clusters) <= 1):
+            is_in_cluster = False
+            # Remove previously checked clusters
+            sorted_clusters = list(
+                filter(lambda tmp_cluster: tmp_cluster.cluster_index not in prechecked_clusters, sorted_clusters))
+            for cluster in sorted_clusters:
+                is_in_cluster, _ = multivariable_check_model_within_threshold(cluster, x_values, y_value,
+                                                                              error_tolerance, model_type=model_type)
+                if is_in_cluster:
+                    cluster_id = cluster.cluster_index
+                    break
+
+        if not is_in_cluster:
+            is_outlier = True
+    else:
+        print("No such batch_method exists")
+
+    interval_check_end = time.time()
+    return interval_check_end - interval_check_start, index, is_outlier, cluster_id
+
+
 def rows_in_cluster(x_values, y_values, sorted_clusters: list[models.Cluster], error_tolerance: float):
     return check_models_within_threshold(sorted_clusters, x_values, y_values, error_tolerance)
 
@@ -85,10 +294,15 @@ def unpack_batch_args(args):
     return row_in_cluster(*args)
 
 
+def unpack_multivariable_batch_args(args):
+    return multivariable_row_in_cluster(*args)
+
+
 def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[models.Cluster],
-                  x_label: str, y_label: str, x_tree: np.array, y_tree: list, error_tolerance: float,
+                  x_label: str, y_label: str, x_tree: np.array, y_tree: list, kdtree, error_tolerance: float,
                   verbose=False, clustering_destination=None, cur_partition_num=0, model_type='linear_regression',
-                  null_method='outliers', replacement_x=None, replacement_y=None, provide_error=False) -> tuple[list, list[tuple], list[float], list[float]]:
+                  null_method='outliers', replacement_x=None, replacement_y=None, provide_error=False) -> tuple[
+    list, list[tuple], list[float], list[float]]:
     """
     Fit new data points into existing clusters or mark them as outliers. Batch method determines which method is used for fitting the new data.
 
@@ -102,7 +316,7 @@ def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[mode
     # Initialize the variables
     clusters = clusters
     if batch_method != 'kd_tree_index':
-        sorted_clusters = sorted(clusters, key=lambda obj: obj.sample_y_value)
+        sorted_clusters = sorted(clusters, key=lambda obj: obj.sample_y_value.all())
     else:
         sorted_clusters = clusters
 
@@ -120,7 +334,8 @@ def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[mode
             y_value = getattr(row, y_label)
             index = getattr(row, column_index_variable)
             batch_rows.append(
-                (x_value, y_value, index, batch_method, sorted_clusters, x_tree, y_tree, error_tolerance, model_type,
+                (x_value, y_value, index, batch_method, sorted_clusters, x_tree, y_tree, kdtree, error_tolerance,
+                 model_type,
                  null_method, replacement_x, replacement_y, provide_error))
 
     process_results = []
@@ -129,7 +344,8 @@ def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[mode
         if len(batch_rows) > 0:
             chunksize = max(1, ceil(len(batch_rows) / (n_procs * 4)))
             with Pool(n_procs) as p:
-                for result in tqdm.tqdm(p.imap_unordered(unpack_batch_args, batch_rows, chunksize=chunksize), total=len(batch_rows), desc='Processing Rows', colour='green', leave=False):
+                for result in tqdm.tqdm(p.imap_unordered(unpack_batch_args, batch_rows, chunksize=chunksize),
+                                        total=len(batch_rows), desc='Processing Rows', colour='green', leave=False):
                     process_results.append(result)
 
     else:
@@ -150,7 +366,6 @@ def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[mode
     # (Row Index, Cluster Index)
     batch_inlier_cluster_indexes = (list(map(lambda x: (x[1], x[3]), row_inliers)))
 
-
     # End timing fit_new_batch
     fit_batch_end = time.time()
 
@@ -169,6 +384,85 @@ def fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[mode
             cluster.flush_cluster(clustering_destination, y_label, cur_partition_num)
 
     return batch_outliers, batch_inlier_cluster_indexes, outlier_errors, inlier_errors
+
+
+def multivariable_fit_new_batch(new_data: pd.DataFrame, batch_method: str, clusters: list[models.Cluster],
+                                x_label: list[str], y_label: str, x_tree: np.array, y_tree: list, kd_tree: KDTree,
+                                error_tolerance: float,
+                                verbose=False, clustering_destination=None, cur_partition_num=0,
+                                model_type='linear_regression',
+                                null_method='outliers', replacement_x: list = None, replacement_y=None) -> tuple[
+    list, list[tuple]]:
+    """
+    Fit new data points into existing clusters or mark them as outliers. Batch method determines which method is used for fitting the new data.
+
+    Returns:
+        A tuple with the first element being the updated list of clusters and the second element being the updated
+        list of outliers.
+    """
+    assert model_type == 'multivariable LR'
+
+    # Start timing fit_new_batch
+    fit_batch_start = time.time()
+
+    # Initialize the variables
+    clusters = clusters
+    sorted_clusters = sorted(clusters, key=lambda obj: obj.sample_y_value)
+
+    # Clear clusters for batch fitting
+    if cur_partition_num == 0 and batch_method != "binary_search":
+        for cluster in sorted_clusters:
+            # Does not persist values since this is before each partition is processed, from sampling clusters
+            cluster.flush_cluster(clustering_destination, y_label, cur_partition_num)
+
+    # Loop through new data points
+    batch_rows = []
+    for row in tqdm.tqdm(new_data.itertuples(), desc='Preparing Rows for Processing', colour='red', leave=False):
+        x_val_lst = [getattr(row, x_lab) for x_lab in x_label]
+        y_value = getattr(row, y_label)
+        index = getattr(row, column_index_variable)
+        # print(x_val_lst)
+        batch_rows.append(
+            (x_val_lst, y_value, index, batch_method, sorted_clusters, x_tree, y_tree, kd_tree, error_tolerance,
+             model_type,
+             null_method, replacement_x, replacement_y))
+
+    process_results = []
+
+    n_procs = max(1, config_get('num_processes'))
+    if len(batch_rows) > 0:
+        chunksize = max(1, ceil(len(batch_rows) / (n_procs * 4)))
+        with Pool(n_procs) as p:
+            for result in tqdm.tqdm(p.imap_unordered(unpack_multivariable_batch_args, batch_rows, chunksize=chunksize),
+                                    total=len(batch_rows), desc='Processing Rows', colour='green', leave=False):
+                process_results.append(result)
+
+    row_times = list(map(lambda x: x[0], process_results))
+    row_outliers = list(filter(lambda x: x[2] == True, process_results))
+    batch_outliers = (list(map(lambda x: x[1], row_outliers)))
+    row_inliers = list(filter(lambda x: x[2] == False, process_results))
+
+    # (Row Index, Cluster Index)
+    batch_inlier_cluster_indexes = (list(map(lambda x: (x[1], x[3]), row_inliers)))
+
+    # End timing fit_new_batch
+    fit_batch_end = time.time()
+
+    # Calculate the total time spent in fit_new_batch
+    total_fit_batch_time = fit_batch_end - fit_batch_start
+
+    if verbose:
+        avg_row_time = sum(row_times) / len(row_times)
+        print(f"Total time taken in fit_new_batch: {total_fit_batch_time:.4f} seconds")
+        print(f"Time spent in interval_index_check: {avg_row_time:.4f} seconds")
+        print(f"Proportion of time in interval_index_check: {(avg_row_time / total_fit_batch_time):.4%}")
+
+    # Clear clusters for new batch fitting
+    if batch_method == "binary_search":
+        for cluster in sorted_clusters:
+            cluster.flush_cluster(clustering_destination, y_label, cur_partition_num)
+
+    return batch_outliers, batch_inlier_cluster_indexes
 
 
 def create_interval_index(batch_method: str, data: pd.DataFrame, clusters: list[models.Cluster], x_label: str,
@@ -191,9 +485,23 @@ def create_interval_index(batch_method: str, data: pd.DataFrame, clusters: list[
     elif batch_method == "binary_search":
         pass
     elif batch_method == "kd_tree_index":
-        raise ValueError("KD Tree Index method is currently not available in this version.")
+        kd_index = create_kd_tree_index(clusters, leaf_level)
 
     return x_index, y_index, kd_index
+
+
+"""
+================================
+Batch Method: K-D Tree Index
+================================
+"""
+
+
+def create_kd_tree_index(clusters: np.array, leaf_level=40):
+    # For each cluster, obtain the representative point
+    cluster_representative_points = [cur_cluster.representative_point for cur_cluster in clusters]
+    tree = KDTree(cluster_representative_points, leaf_level)
+    return tree
 
 
 """
@@ -202,6 +510,7 @@ Batch Method: Array Index
 ================================
 """
 
+
 def create_range_array_index(data: pd.DataFrame, clusters: np.array, x_label: str, error_tolerance: float,
                              density_split=1000) -> tuple[np.array, list]:
     """
@@ -209,7 +518,12 @@ def create_range_array_index(data: pd.DataFrame, clusters: np.array, x_label: st
     Optimized for large cluster counts using direct coefficient access.
     """
     # Sort the data based on x_label
-    sorted_data = data.sort_values(by=x_label)
+    is_x_a_vector = hasattr(data.loc[0, x_label], '__len__')
+
+    if is_x_a_vector:
+        sorted_data = data.sort_values(by=x_label, key=lambda s: s.apply(tuple))
+    else:
+        sorted_data = data.sort_values(by=x_label)
 
     # Calculate the number of points per interval
     total_points = len(sorted_data)
@@ -227,13 +541,21 @@ def create_range_array_index(data: pd.DataFrame, clusters: np.array, x_label: st
     i = 0
     while i < total_points:
         chunk = sorted_data.iloc[i:i + points_per_interval]
-        x_min, x_max = chunk[x_label].min(), chunk[x_label].max()
+        if is_x_a_vector:
+            chunk_as_tuples = chunk[x_label].apply(tuple)
+            x_min, x_max = chunk_as_tuples.min(), chunk_as_tuples.max()
+        else:
+            x_min, x_max = chunk[x_label].min(), chunk[x_label].max()
 
         # If the x_min and x_max are the same, adjust the range
         while x_min == x_max and i + points_per_interval < total_points:
             i += points_per_interval
             next_chunk = sorted_data.iloc[i:i + points_per_interval]
-            x_max = next_chunk[x_label].max()
+            if is_x_a_vector:
+                next_chunk_as_tuples = next_chunk[x_label].apply(tuple)
+                x_max = next_chunk_as_tuples.max()
+            else:
+                x_max = next_chunk[x_label].max()
 
         # Edge case where the last interval is still zero-width
         if x_min == x_max:
@@ -246,12 +568,28 @@ def create_range_array_index(data: pd.DataFrame, clusters: np.array, x_label: st
         x_min_values.append(x_min)
         prev_x_max = x_max
 
-        # Direct algebraic calculation instead of predict()
-        y_predictions_min = slopes * x_min + intercepts
-        y_predictions_max = slopes * x_max + intercepts
+        y_predictions_min = []
+        y_predictions_max = []
+        predicting_feature_count = 1
+
+        if is_x_a_vector:
+            for cluster in clusters:
+                y_value_at_x_min = cluster.model.predict([x_min])[0]
+                y_value_at_x_max = cluster.model.predict([x_max])[0]
+                y_predictions_min.append(y_value_at_x_min)
+                y_predictions_max.append(y_value_at_x_max)
+                predicting_feature_count = cluster.predicting_feature_count
+        else:
+            # Direct algebraic calculation instead of predict()
+            y_predictions_min = slopes * x_min + intercepts
+            y_predictions_max = slopes * x_max + intercepts
 
         # Vectorized slope and bounds calculation
-        is_positive_slope = slopes > 0
+        if is_x_a_vector:
+            tuple_slope = tuple(0 for _ in range(0, predicting_feature_count))
+            is_positive_slope = slopes > tuple_slope
+        else:
+            is_positive_slope = slopes > 0
 
         y_min_list = np.zeros(len(clusters))
         y_max_list = np.zeros(len(clusters))
@@ -281,8 +619,10 @@ def create_range_array_index(data: pd.DataFrame, clusters: np.array, x_label: st
     return np.array(x_min_values), y_max_min_values
 
 
-def interval_index_check_array(x_value: float, y_value: float, error_tolerance: float, value_index: int, x_min_array: np.array,
-                               y_max_min_values: list, verbose=False, provide_error=False, model_type='linear_regression') -> tuple[bool, int, float | None]:
+def interval_index_check_array(x_value: float, y_value: float, error_tolerance: float, value_index: int,
+                               x_min_array: np.array,
+                               y_max_min_values: list, verbose=False, provide_error=False,
+                               model_type='linear_regression') -> tuple[bool, int, float | None, list]:
     """
     Checks if the provided x and y values fall within the specified range intervals.
     Optimized with binary search and vectorized operations.
@@ -299,7 +639,7 @@ def interval_index_check_array(x_value: float, y_value: float, error_tolerance: 
 
     # Edge Case: If the value is not found or there are no existing y-clusters at the specified x-range
     if index < 0 or index >= len(y_max_min_values):
-        return False, 0, 0
+        return False, 0, 0, []
 
     y_info = y_max_min_values[index]
     y_min_array = y_info[0]
@@ -313,7 +653,11 @@ def interval_index_check_array(x_value: float, y_value: float, error_tolerance: 
     if not np.any(is_within):
         if verbose:
             print("not found in y arrays")
-        return False, 0, 0
+        return False, 0, 0, []
+
+    # Get the first matching cluster index
+    # cluster_index = np.argmax(is_within)  # Returns first True index
+    # cluster = cluster_list[cluster_index]
 
     lower_bound = y_value * (1 - (error_tolerance * 1e-2))
     upper_bound = y_value * (1 + (error_tolerance * 1e-2))
@@ -339,15 +683,14 @@ def interval_index_check_array(x_value: float, y_value: float, error_tolerance: 
             finally:
                 clusters_lock.release()
 
-            return True, cluster.cluster_index, prediction_error
-
+            return True, cluster.cluster_index, prediction_error, candidate_indices.tolist()
 
     # In the future, you will need to use add_new_value() function so that it can
     # track the added index like this. Make sure to remove the line
     # cluster.size += 1 as this logic is achieved by the function below
     # cluster.add_new_value(value_index)
 
-    return False, 0, 0
+    return False, 0, 0, candidate_indices.tolist()
 
 
 def find_y_index(y_min_array: np.array, y_max_array: np.array, y_value: float) -> int:
@@ -409,7 +752,7 @@ def value_exists_in_cluster(sorted_clusters: list, x_value: float, y_value: floa
         bool: True if the value exists in a cluster within the error tolerance and is added; False otherwise.
     """
 
-    cluster, predicted_y_val = find_exact_cluster(sorted_clusters, x_value, y_value, error_tolerance)
+    cluster, predicted_y_val, cl_index = find_exact_cluster(sorted_clusters, x_value, y_value, error_tolerance)
 
     if cluster is not None:
         cluster.add_new_value(index, y_value, predicted_y_val)
@@ -449,7 +792,7 @@ def find_exact_cluster(sorted_clusters: list, x_value: float, y_value: float, er
 
     # Check the cluster at the found index
     is_within_threshold, predicted_y, _ = check_model_within_threshold(sorted_clusters[index], x_value, y_value,
-                                                                    error_tolerance)
+                                                                       error_tolerance)
     if is_within_threshold:
         return sorted_clusters[index], predicted_y, index
 
@@ -457,7 +800,7 @@ def find_exact_cluster(sorted_clusters: list, x_value: float, y_value: float, er
     # Check previous clusters (leftwards in the sorted list)
     for i in range(index - 1, -1, -1):
         is_within_threshold, predicted_y, _ = check_model_within_threshold(sorted_clusters[i], x_value, y_value,
-                                                                        error_tolerance)
+                                                                           error_tolerance)
         if predicted_y > upper_bound:
             # We've gone too far left, no need to check further
             break
@@ -467,7 +810,7 @@ def find_exact_cluster(sorted_clusters: list, x_value: float, y_value: float, er
     # Check next clusters (rightwards in the sorted list)
     for i in range(index + 1, n):
         is_within_threshold, predicted_y, _ = check_model_within_threshold(sorted_clusters[i], x_value, y_value,
-                                                                        error_tolerance)
+                                                                           error_tolerance)
         if predicted_y < lower_bound:
             # We've gone too far right, no need to check further
             break
@@ -538,75 +881,167 @@ def check_model_within_threshold(cluster: models.Cluster, x_value: float, y_valu
 
         X = np.array(original_x_value)
         predicted_y = cluster.model.predict(X)[0]
-    else:
-        predicted_y = cluster.model.predict([[x_value]])[0]  # Predict y_value using the cluster's model
-    lower_bound = y_value * (1 - (error_tolerance * 1e-2))
-    upper_bound = y_value * (1 + (error_tolerance * 1e-2))
+        lower_bound = y_value * (1 - (error_tolerance * 1e-2))
+        upper_bound = y_value * (1 + (error_tolerance * 1e-2))
 
-    prediction_error = 0
-    if provide_error:
-        prediction_error = list_of_percent_differences([y_value], [predicted_y])[0]
+        prediction_error = 0
+        if provide_error:
+            prediction_error = list_of_percent_differences([y_value], [predicted_y])[0]
+
+        # Return both the check result and the predicted_y
+        return lower_bound <= predicted_y <= upper_bound, predicted_y, prediction_error
+    else:
+        if hasattr(y_value, '__len__'):  # vector case
+            predicted_y = cluster.model.predict([x_value])[0]
+
+            # Convert to NumPy arrays
+            y_vec = np.array(y_value)
+            pred_vec = np.array(predicted_y)
+
+            # Inline padding to match lengths
+            if len(y_vec) != len(pred_vec):
+                max_len = max(len(y_vec), len(pred_vec))
+                if len(y_vec) < max_len:
+                    y_vec = np.pad(y_vec, (0, max_len - len(y_vec)))
+                else:
+                    pred_vec = np.pad(pred_vec, (0, max_len - len(pred_vec)))
+
+            # Cosine similarity
+            dot = np.dot(y_vec, pred_vec)
+            norms = np.linalg.norm(y_vec) * np.linalg.norm(pred_vec)
+
+            # Handle edge cases, set cosine similarity to neutral since the values are technically undefined
+            if norms == 0 or np.isinf(norms):
+                cos_sim = 0.0
+            else:
+                cos_sim = dot / norms
+
+            error_threshold = 1 - (error_tolerance * 1e-2)
+            return cos_sim >= error_threshold, predicted_y, cos_sim
+
+        else:
+            predicted_y = cluster.model.predict([[x_value]])[0]
+            lower_bound = y_value * (1 - (error_tolerance * 1e-2))
+            upper_bound = y_value * (1 + (error_tolerance * 1e-2))
+
+            prediction_error = 0
+            if provide_error:
+                prediction_error = list_of_percent_differences([y_value], [predicted_y])[0]
+
+            # Return both the check result and the predicted_y
+            return lower_bound <= predicted_y <= upper_bound, predicted_y, prediction_error
+
+
+def multivariable_check_model_within_threshold(cluster: models.Cluster, x_values: list[float], y_value: float,
+                                               error_tolerance: float,
+                                               model_type=None) -> \
+        tuple[bool, float]:
+    """
+    Check if the predicted y_value from the cluster's model is within the error tolerance.
+
+    Args:
+        cluster (Cluster): The cluster containing the model used to predict the y_value.
+        x_value (float): The x_value used for prediction.
+        y_value (float): The target y_value for comparison.
+        error_tolerance (float): The acceptable margin of error for matching the predicted y_value.
+
+    Returns:
+        - bool: True if the predicted y_value is within the error tolerance, False otherwise.
+        - float: The predicted y_value from the model.
+    """
+    assert model_type == 'multivariable LR'
+    predicted_y: float = cluster.model.predict([x_values])[0]  # Predict y_value using the cluster's model
+    lower_bound = y_value * (1 - error_tolerance)
+    upper_bound = y_value * (1 + error_tolerance)
 
     # Return both the check result and the predicted_y
-    return lower_bound <= predicted_y <= upper_bound, predicted_y, prediction_error
+    return lower_bound <= predicted_y <= upper_bound, predicted_y
 
 
+def check_models_within_threshold(clusters: list[models.Cluster], x_values: list, y_values: list,
+                                  error_tolerance: float) -> list[tuple[float, int, bool, int]]:
+    result_tuples: list[tuple[float, int, bool, int]] = []
 
-def check_models_within_threshold(clusters: list[models.Cluster], x_values: list[float], y_values: list[float],
-                                  error_tolerance: float) -> list[tuple[float, int, bool]]:
-    """
-        Check if the predicted y_values from the cluster models are within the error tolerance.
+    # Pre-fill result tuples
+    for i in range(len(y_values)):
+        result_tuples.append((0, i, True, -1))
 
-        Args:
-            clusters (list[Cluster]): The clusters containing the model used to predict the y_value.
-            x_values (list[float]): The x_values used for prediction.
-            y_values (list[float]): The target y_values for comparison.
-            error_tolerance (float): The acceptable margin of error for matching the predicted y_value.
+    # Build X using the first cluster's model input shape
+    model = clusters[0].model
+    _, timesteps, features = model.input_shape
 
-        Returns:
-            list of tuples where each tuple is organized as:
-            - float: time to predict replaced y_value
-            - int: The index of the value.
-            - bool: True if the predicted y_value is within the error tolerance, False otherwise.
-        """
-    result_tuples: list[tuple[float, int, bool]] = []
+    # Convert x_values into a uniform NumPy structure
+    # Case 1: scalar model
+    if timesteps == 1 and features == 1:
+        scalar_x = []
+        for xv in x_values:
+            if hasattr(xv, "__len__"):
+                xv = np.array(xv, dtype=np.float64)
+                xv = float(np.mean(xv))
+            else:
+                xv = float(xv)
+            scalar_x.append(xv)
 
-    original_x_values = np.array(x_values).reshape(-1, 1)
+        X = np.array(scalar_x, dtype=np.float64).reshape(len(scalar_x), 1, 1)
+    # Case 2: vector model
+    elif timesteps == 1:
+        vector_x = []
+        for xv in x_values:
+            xv = np.array(xv, dtype=np.float64)
+            if xv.ndim == 1:
+                vector_x.append(xv)
+            else:
+                vector_x.append(np.mean(xv, axis=0))
+        vector_x = np.array(vector_x, dtype=np.float64)
+        X = vector_x.reshape(len(vector_x), 1, features)
+    # Case 3: sequence model
+    else:
+        X = pad_sequences(x_values, dtype='float64', padding='post')
 
-    X = np.array(original_x_values)
-    y_boundaries: list[tuple[float, float]] = []
+        # Ensure padded length matches model timesteps
+        if X.shape[1] != timesteps:
+            if X.shape[1] > timesteps:
+                X = X[:, :timesteps, :]
+            else:
+                pad_len = timesteps - X.shape[1]
+                X = np.pad(X, ((0, 0), (0, pad_len), (0, 0)))
+
+    # Build y-boundaries (CPU only)
+    y_boundaries = []
     for y_val in y_values:
-        # Initialize the result tuples to simplify later logic
-        result_tuples.append((-1, -1, True))
+        if hasattr(y_val, "__len__"):
+            y_boundaries.append(("vector", np.array(y_val)))
+        else:
+            lower = y_val * (1 - error_tolerance)
+            upper = y_val * (1 + error_tolerance)
+            y_boundaries.append(("scalar", (lower, upper)))
 
-        lower_bound = y_val * (1 - error_tolerance)
-        upper_bound = y_val * (1 + error_tolerance)
-        y_boundaries.append((lower_bound, upper_bound))
-
+    # Evaluate each cluster without multiprocessing for TF
     for cluster in clusters:
-        interval_check_start = time.time()
+        # Predict in the parent process (GPU-safe)
+        interval_start = time.time()
         predicted_y_vals = cluster.model.predict(X)
-        predicted_y_vals = list(map(lambda predicted: predicted[0], predicted_y_vals))
+        interval_end = time.time() - interval_start
 
-        assert len(y_values) == len(predicted_y_vals)
+        predicted_y_vals = predicted_y_vals.astype(np.float64)
 
-        interval_check_end = time.time() - interval_check_start
+        # Prepare CPU-only comparison tasks
+        unzipped_list = [
+            (i, predicted_y_vals[i], y_boundaries[i], error_tolerance)
+            for i in range(len(predicted_y_vals))
+        ]
 
-        # Combine inputs for parallel execution
-        zipped_lists = enumerate(list(zip(predicted_y_vals, y_boundaries)))
-        unzipped_list = list(map(lambda x: (x[0], x[1][0], x[1][1][0], x[1][1][1]), zipped_lists))
-
+        # Multiprocessing for CPU comparisons
         with Pool(config_get('num_processes')) as pool:
-            for result in pool.imap(unpack_range_predictions, unzipped_list, chunksize=ceil(len(unzipped_list) / 22)):
+            for result in pool.imap(unpack_range_or_cosine, unzipped_list, chunksize=ceil(len(unzipped_list) / 22)):
                 result_index = result[1]
                 result_in_cluster = result[0]
 
-                if result_tuples[result_index][1] and result_in_cluster:
-                    result_tuples[result_index] = (interval_check_end, result_index, False)
+                if result_tuples[result_index][2] and result_in_cluster:
+                    result_tuples[result_index] = (interval_end, result_index, False, cluster.cluster_index)
 
-        # Check if no more values need checked in remaining clusters
-        remaining_outliers = list(filter(lambda output_tuple: output_tuple[2] is True, result_tuples))
-        if len(remaining_outliers) == 0:
+        # Stop early if all matched
+        if all(t[2] is False for t in result_tuples):
             break
 
     return result_tuples
@@ -614,6 +1049,36 @@ def check_models_within_threshold(clusters: list[models.Cluster], x_values: list
 
 def unpack_range_predictions(args):
     return predicted_is_in_range(*args)
+
+
+def unpack_range_or_cosine(args):
+    idx, predicted_y, y_boundary, error_tolerance = args
+    mode, data = y_boundary
+
+    if mode == "vector":
+        y_vec = data
+        pred_vec = np.array(predicted_y)
+
+        # Pad to equal length
+        if len(y_vec) != len(pred_vec):
+            max_len = max(len(y_vec), len(pred_vec))
+            y_vec = np.pad(y_vec, (0, max_len - len(y_vec)))
+            pred_vec = np.pad(pred_vec, (0, max_len - len(pred_vec)))
+
+        dot = np.dot(y_vec, pred_vec)
+        norms = np.linalg.norm(y_vec) * np.linalg.norm(pred_vec)
+
+        if norms == 0 or np.isinf(norms):
+            cos_sim = 0.0
+        else:
+            cos_sim = dot / norms
+
+        # Same threshold logic as your first block
+        error_threshold = 1 - (error_tolerance * 1e-2)
+        return (cos_sim >= error_threshold, idx)
+
+    lower, upper = data
+    return (lower <= predicted_y <= upper, idx)
 
 
 def predicted_is_in_range(index: int, y_predicted: float, lower_bound: float, upper_bound: float):
@@ -627,7 +1092,8 @@ Batch Method: Tree Index
 """
 
 
-def interval_index_check(x_value: float, y_value: float, interval_tree: IntervalTree, verbose=False) -> tuple[bool, int]:
+def interval_index_check(x_value: float, y_value: float, interval_tree: IntervalTree, verbose=False) -> tuple[
+    bool, int]:
     """
     Traverse the interval tree and add the value to a cluster if it falls within the correct x and y intervals.
     

@@ -1,7 +1,7 @@
 database: archive/sntemp_inputs_outputs_lordville_with_index.parquet
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: 'linear_regression'
+machine_learning_model: 'multivariable LR'
 automate_feature_selection: false
 use_one_predictor: true
 use_global_accuracy: true
@@ -16,52 +16,70 @@ sample_max_attempts: 5
 num_processes: 22
 index_column_name: 'Index'
 memory_logging: false
-max_unsupervised_depth: 1000
-excluded_attributes:
-  - "seg_humid"
-  - "seg_shade"
-  - "seg_tave_sroff"
+max_unsupervised_depth: 100
+#excluded_attributes:
+#  - "seg_humid"
+#  - "seg_shade"
+#  - "seg_tave_sroff"
 
 runtime_parameters:
-#    choice_6:
+#    choice_4:
 #      predictor:
+#        - "seg_tave_gw"
 #        - "seginc_gwflow"
 #      clustering: unsupervised
 #      cluster_alg: Minhal
-#      machine_learning_model: 'linear_regression'
+#      machine_learning_model: 'multivariable LR'
 #      accuracy: 1
 #      split_size: 4
 #      preprocess_data: false
 #      postprocess_data: true
 #      batch_size: "256MB"
-#      batch_method: array_index
+#      batch_method: kd_tree_index
+#    choice_5:
+#      predictor:
+#        - "seg_tave_gw"
+#        - "seg_width"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'multivariable LR'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: kd_tree_index
+#    choice_6:
+#      predictor:
+#        - "seginc_gwflow"
+#        - "seg_width"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'multivariable LR'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: kd_tree_index
     choice_7:
       predictor:
         - "seg_tave_gw"
+        - "seginc_gwflow"
+        - "seg_width"
       clustering: unsupervised
       cluster_alg: Minhal
-      machine_learning_model: 'linear_regression'
+      machine_learning_model: 'multivariable LR'
       accuracy: 1
       split_size: 4
       preprocess_data: false
       postprocess_data: true
-      batch_size: "64MB"
+      batch_size: "256MB"
       batch_method: kd_tree_index
-      persist_structures: false
-      build_analysis: true
+      persist_structures: true
+      build_analysis: false
       provide_error: false
-#    choice_8:
-#      predictor:
-#        - "seg_width"
-#      clustering: unsupervised
-#      cluster_alg: Minhal
-#      machine_learning_model: 'linear_regression'
-#      accuracy: 1
-#      split_size: 4
-#      preprocess_data: false
-#      postprocess_data: true
-#      batch_size: "256MB"
-#      batch_method: array_index
+
 
 # Specifies the behavior for missing values
 handle_nulls:
@@ -142,147 +160,223 @@ handle_nulls:
 # Example is based off the slide 9 of ADBIS Presentation slides
 # If automate_feature_selection is set to true, this section will be ignored
 predicted_by:
+  seg_id_nat:
+    predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
+    accuracy: 1
+    model: 'multivariable LR'
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: kd_tree_index
+  model_idx:
+    predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
+    accuracy: 1
+    model: 'multivariable LR'
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: kd_tree_index
   seg_ccov:
     predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
       - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
-  seg_humid:
-    predictors:
-      - "seg_width"
-    accuracy: 1
-    model: 'linear_regression'
-    clustering: unsupervised
-    cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_outflow:
     predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
       - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_rain:
     predictors:
+      - "seg_tave_gw"
       - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_shade:
     predictors:
+      - "seg_tave_gw"
       - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_tave_air:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
-  seg_tave_sroff:
+    batch_method: kd_tree_index
+#  seg_tave_gw:
+#    predictors:
+#      - "seg_tave_gw"
+#      - "seginc_gwflow"
+#      - "seg_width"
+#    accuracy: 1
+#    model: 'multivariable LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: kd_tree_index
+  seg_humid:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_tave_ss:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_tave_upstream:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_tave_water:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_upstream_inflow:
     predictors:
+      - "seg_tave_gw"
       - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
+#  seg_width:
+#    predictors:
+#      - "seg_tave_gw"
+#      - "seginc_gwflow"
+#      - "seg_width"
+#    accuracy: 1
+#    model: 'multivariable LR'
+#    clustering: unsupervised
+#    cluster_alg: Minhal
+#    batch_method: kd_tree_index
+  seg_tave_sroff:
+    predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
+    accuracy: 1
+    model: 'multivariable LR'
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: kd_tree_index
   seginc_potet:
     predictors:
+      - "seg_tave_gw"
       - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seginc_sroff:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seginc_ssflow:
     predictors:
       - "seg_tave_gw"
-    accuracy: 1
-    model: 'linear_regression'
-    clustering: unsupervised
-    cluster_alg: Minhal
-    batch_method: array_index
-  seginc_swrad:
-    predictors:
+      - "seginc_gwflow"
       - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
+  seginc_swrad:
+    predictors:
+      - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
+    accuracy: 1
+    model: 'multivariable LR'
+    clustering: unsupervised
+    cluster_alg: Minhal
+    batch_method: kd_tree_index
   seg_length:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_slope:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index
   seg_elev:
     predictors:
       - "seg_tave_gw"
+      - "seginc_gwflow"
+      - "seg_width"
     accuracy: 1
-    model: 'linear_regression'
+    model: 'multivariable LR'
     clustering: unsupervised
     cluster_alg: Minhal
-    batch_method: array_index
+    batch_method: kd_tree_index

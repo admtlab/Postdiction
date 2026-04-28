@@ -1,7 +1,7 @@
 import pandas as pd
 
 from models import Cluster
-from helper import size
+from helper import size, size_text
 from config import config_get
 import math
 
@@ -63,6 +63,7 @@ def free_clusters_to_nearest_power_of_2(clusters: list[Cluster]) -> tuple[list[C
 
     sorted_clusters = sorted(clusters.copy())
     nearest_power_of_2 = 2 ** (math.floor(math.log2(len(clusters))))
+    # print(f"nearest power of 2: {nearest_power_of_2}")
     new_outliers = 0
 
     for cluster in sorted_clusters:
@@ -71,13 +72,23 @@ def free_clusters_to_nearest_power_of_2(clusters: list[Cluster]) -> tuple[list[C
             break
 
         new_outliers += cluster.size
+        # print(f"INliers: {cluster.size}")
         sorted_clusters.remove(cluster)
+
+    # cluster = sorted_clusters[0]
+    #
+    # if len(sorted_clusters) == nearest_power_of_2 - 1:
+    #     return sorted_clusters, new_outliers
+    #
+    # # If not smaller yet, remove smallest cluster and check
+    # new_outliers += cluster.length()
+    # sorted_clusters.remove(cluster)
 
     return sorted_clusters, new_outliers
 
 
 def free_clusters_to_best_compression(clusters: list[Cluster], num_outliers: int,
-                                      datatype_of_predicted_attribute: str, data_length: int, result_location, y_label: str) -> tuple[
+                                      datatype_of_predicted_attribute: str, data_length: int, result_location, y_label: str, word2vec_path_name, y_vec_max_len=1, x_vec_max_len=None, binary=False) -> tuple[
     list[Cluster], int]:
     prev_clusters = clusters.copy()
     prev_outliers = num_outliers
@@ -90,11 +101,20 @@ def free_clusters_to_best_compression(clusters: list[Cluster], num_outliers: int
         curr_clusters, curr_outliers = free_clusters_to_nearest_power_of_2(prev_clusters)
         curr_num_outliers = curr_outliers + prev_outliers
 
-        prev_compressed_size, original_size, ratio, _, _, _, _ = size(len(prev_clusters), prev_outliers,
-                                                          datatype_of_predicted_attribute, data_length, y_label)
-        curr_compressed_size, original_size, ratio, _, _, _, _ = size(len(curr_clusters), curr_num_outliers,
-                                                          datatype_of_predicted_attribute, data_length, y_label)
+        if (datatype_of_predicted_attribute == 'string[pyarrow]' or datatype_of_predicted_attribute == 'str') and not binary:
+            prev_compressed_size, original_size, ratio, _, _, _, _ = size_text(len(prev_clusters), (prev_outliers * y_vec_max_len),
+                                                                          data_length, (data_length * y_vec_max_len), word2vec_path_name,
+                                                                          x_vec_max_len)
+            curr_compressed_size, original_size, ratio, _, _, _, _ = size_text(len(curr_clusters), (curr_num_outliers * y_vec_max_len),
+                                                                          data_length, (data_length * y_vec_max_len), word2vec_path_name,
+                                                                          x_vec_max_len)
+        else:
+            prev_compressed_size, original_size, ratio, _, _, _, _ = size(len(prev_clusters), prev_outliers,
+                                                              datatype_of_predicted_attribute, data_length, y_label)
+            curr_compressed_size, original_size, ratio, _, _, _, _ = size(len(curr_clusters), curr_num_outliers,
+                                                              datatype_of_predicted_attribute, data_length, y_label)
 
+        # print(f"{prev_compressed_size} -> {curr_compressed_size}")
         if curr_compressed_size > prev_compressed_size or len(curr_clusters) <= 1:
             # Reducing to this number of clusters adds too many outliers to be worth it
             break

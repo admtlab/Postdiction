@@ -1,7 +1,7 @@
 database: "archive/exceeds_ram/zipf.parquet"
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: "linear_regression"
+machine_learning_model: 'linear_regression'
 automate_feature_selection: false
 use_one_predictor: true
 use_global_accuracy: true
@@ -14,26 +14,54 @@ approximate_sampled_rows: 100000
 sampling_seed: 17
 sample_max_attempts: 5
 num_processes: 22
-index_column_name: "uid"
+index_column_name: 'uid'
 memory_logging: false
-# max_unsupervised_depth: 1000
+max_unsupervised_depth: 500
+#excluded_attributes:
+#  - "time_taken"
+#  - "altitude"
+
 
 runtime_parameters:
-  choice_7:
-    predictor:
-      - "employeeID"
-    clustering: unsupervised
-    cluster_alg: Minhal
-    machine_learning_model: "linear_regression"
-    accuracy: 1
-    split_size: 4
-    preprocess_data: false
-    postprocess_data: true
-    batch_size: "256MB"
-    batch_method: array_index
-    persist_structures: false
-    build_analysis: true
-    provide_error: false
+#    choice_6:
+#      predictor:
+#        - "seginc_gwflow"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'linear_regression'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: array_index
+    choice_7:
+      predictor:
+        - "employeeID"
+      clustering: unsupervised
+      cluster_alg: Minhal
+      machine_learning_model: 'linear_regression'
+      accuracy: 1
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "256MB"
+      batch_method: array_index
+      persist_structures: false
+      build_analysis: true
+      provide_error: false
+#    choice_8:
+#      predictor:
+#        - "seg_width"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'linear_regression'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: array_index
 
 handle_nulls:
   employeeID:
@@ -52,14 +80,16 @@ handle_nulls:
     method: outliers
     replacement_value: -1
 
+
 # Specifies which features are used to predictors for other features
-# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
 predicted_by:
   age:
     predictors:
       - "employeeID"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -67,7 +97,7 @@ predicted_by:
     predictors:
       - "employeeID"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -75,7 +105,7 @@ predicted_by:
     predictors:
       - "employeeID"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -83,7 +113,7 @@ predicted_by:
     predictors:
       - "employeeID"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index

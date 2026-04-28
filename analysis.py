@@ -1,9 +1,13 @@
+import matplotlib
+
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from pathlib import Path
 
 from helper import create_file_if_not_exists
+
 
 def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_df: pd.DataFrame, output_dir):
     """
@@ -55,9 +59,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
 
     sns.set_theme(style="whitegrid", context="talk")
 
-    # -----------------------------
     # Original vs Compressed Size
-    # -----------------------------
     x = range(len(overall_results_df))
 
     plt.figure(figsize=(12, 6))
@@ -102,9 +104,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "original_vs_compressed.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-    # -----------------------------
     # Breakdown of Compressed Size
-    # -----------------------------
     x = range(len(overall_results_df))
 
     plt.figure(figsize=(12, 6))
@@ -163,10 +163,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "overheads_of_compressed.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-
-    # -----------------------------
     # Percentage Reduction
-    # -----------------------------
     plt.figure(figsize=(12, 6))
     ax = sns.barplot(
         x=x,
@@ -191,14 +188,11 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "percentage_reduction.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-    # -----------------------------
     # Cumulative Compression
-    # -----------------------------
     plt.figure(figsize=(10, 6))
 
     # Accessible line styles
     line_styles = ["-", "--", "-.", ":"]
-
     x = range(len(overall_results_df))
 
     plt.plot(
@@ -226,9 +220,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "cumulative_compression.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-    # -----------------------------
     # Outliers vs Compression
-    # -----------------------------
     plt.figure(figsize=(10, 6))
 
     # Accessible marker styles
@@ -266,9 +258,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "outliers_vs_compression.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-    # -----------------------------
     # Clusters vs Compression
-    # -----------------------------
     plt.figure(figsize=(10, 6))
 
     sns.scatterplot(
@@ -292,6 +282,7 @@ def plot_storage_reduction(overall_results_df: pd.DataFrame, individual_results_
     plt.savefig(output_dir / "clusters_vs_compression.png", dpi=300, bbox_inches="tight")
     plt.close()
 
+
 def save_plot(fig, outdir, filename):
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -304,19 +295,14 @@ def main(data_name: str):
     import numpy as np
     from pathlib import Path
     import seaborn as sns
-    import matplotlib.pyplot as plt
 
     root_dir = Path('.') / 'results' / 'analysis' / 'errors' / f'{data_name}'
 
-    # ------------------------------------------------------------
     # Load data
-    # ------------------------------------------------------------
     post_df = pd.read_csv(Path('.') / 'results' / 'linear_regression' / f"{data_name}_output_summary.csv")
     lossy_df = pd.read_csv(Path('.') / 'results' / 'compression' / f"{data_name}_error_results.csv")
 
-    # ------------------------------------------------------------
     # Normalize postdiction
-    # ------------------------------------------------------------
     def normalize_postdiction(df):
         records = []
         for _, row in df.iterrows():
@@ -345,9 +331,7 @@ def main(data_name: str):
             })
         return pd.DataFrame(records)
 
-    # ------------------------------------------------------------
     # Normalize lossy compression
-    # ------------------------------------------------------------
     def normalize_lossy(df):
         records = []
         for _, row in df.iterrows():
@@ -377,9 +361,7 @@ def main(data_name: str):
             })
         return pd.DataFrame(records)
 
-    # ------------------------------------------------------------
     # Combine and clean
-    # ------------------------------------------------------------
     post_long = normalize_postdiction(post_df)
     lossy_long = normalize_lossy(lossy_df)
     combined = pd.concat([post_long, lossy_long], ignore_index=True)
@@ -388,9 +370,7 @@ def main(data_name: str):
     combined[numeric_cols] = combined[numeric_cols].apply(pd.to_numeric, errors="coerce")
     combined[numeric_cols] = combined[numeric_cols].fillna(0)
 
-    # ------------------------------------------------------------
     # Melt into long format for boxplots
-    # ------------------------------------------------------------
     long_stats = combined.melt(
         id_vars=["method", "feature", "error_type"],
         value_vars=["mean", "median", "min", "max", "std"],
@@ -398,15 +378,11 @@ def main(data_name: str):
         value_name="value"
     )
 
-    # ------------------------------------------------------------
     # Split into inliers and outliers
-    # ------------------------------------------------------------
     inliers = long_stats[long_stats["error_type"] == "inlier"]
     outliers = long_stats[long_stats["error_type"] == "outlier"]
 
-    # ------------------------------------------------------------
     # Plot: Inliers
-    # ------------------------------------------------------------
     sns.set_theme(style="whitegrid", context="talk")
     plt.figure(figsize=(18, 8))
 
@@ -440,9 +416,7 @@ def main(data_name: str):
     plt.tight_layout()
     save_plot(plt, root_dir, 'box-inliers.png')
 
-    # ------------------------------------------------------------
     # Plot: Outliers
-    # ------------------------------------------------------------
     plt.figure(figsize=(18, 8))
 
     sns.boxplot(
@@ -474,8 +448,6 @@ def main(data_name: str):
     plt.tight_layout()
     save_plot(plt, root_dir, 'box-outliers.png')
 
-    import numpy as np
-
     def plot_cdf(df, title, file_title):
         plt.figure(figsize=(14, 8))
 
@@ -502,18 +474,14 @@ def main(data_name: str):
         plt.tight_layout()
         save_plot(plt, root_dir, f'cdf-{file_title}.png')
 
-    # -----------------------------
     # CDF for Inliers
-    # -----------------------------
     plot_cdf(
         df=inliers[inliers["statistic"].isin(["mean", "median", "min", "max", "std"])],
         title="CDF of Per-Column Error Statistics — Inliers",
         file_title='inliers'
     )
 
-    # -----------------------------
     # CDF for Outliers
-    # -----------------------------
     plot_cdf(
         df=outliers[outliers["statistic"].isin(["mean", "median", "min", "max", "std"])],
         title="CDF of Per-Column Error Statistics — Outliers",
@@ -524,5 +492,3 @@ def main(data_name: str):
 if __name__ == "__main__":
     for dataset_name in ['health', 'river', 'air']:
         main(dataset_name)
-
-

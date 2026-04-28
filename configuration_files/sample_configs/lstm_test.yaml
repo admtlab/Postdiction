@@ -1,7 +1,7 @@
 database: "archive/cardio_train.parquet"
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: "lstm"
+machine_learning_model: 'lstm'
 automate_feature_selection: false
 use_one_predictor: false
 use_global_accuracy: true
@@ -14,19 +14,110 @@ approximate_sampled_rows: 10000000
 sampling_seed: 17
 sample_max_attempts: 5
 num_processes: 22
-index_column_name: "Index"
+index_column_name: 'Index'
 
 runtime_parameters:
-  choice_6:
-    predictor: weight
-    clustering: supervised
-    cluster_alg: KM
-    accuracy: 1
-    split_size: 50
-    preprocess_data: false
-    postprocess_data: true
-    batch_size: "256MB"
-    batch_method: exhaustive_search
+#    choice_0:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "2MB"
+#      batch_method: exhaustive_search
+#    choice_1:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "4MB"
+#      batch_method: exhaustive_search
+#    choice_2:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "8MB"
+#      batch_method: exhaustive_search
+#    choice_3:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "16MB"
+#      batch_method: exhaustive_search
+#    choice_4:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 0.25
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: exhaustive_search
+#    choice_5:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 0.5
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: exhaustive_search
+    choice_6:
+      predictor: weight
+      clustering: supervised
+      cluster_alg: KM
+      accuracy: 1
+      split_size: 50
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "256MB"
+      batch_method: exhaustive_search
+#    choice_7:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 2.5
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: exhaustive_search
+#    choice_8:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 5
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: exhaustive_search
+#    choice_10:
+#      predictor: microcontroller_id
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "1GB"
+#      batch_method: exhaustive_search
+
 
 # Specifies the behavior for missing values
 handle_nulls:
@@ -67,14 +158,16 @@ handle_nulls:
     method: outliers
     replacement_value: -1
 
+
 # Specifies which features are used to predictors for other features
-# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
 predicted_by:
   age:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -82,7 +175,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -90,7 +183,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -98,7 +191,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -106,7 +199,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -114,7 +207,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -122,7 +215,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -130,7 +223,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -138,7 +231,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -146,7 +239,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search
@@ -154,7 +247,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "lstm"
+    model: 'lstm'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: exhaustive_search

@@ -1,7 +1,7 @@
 database: archive/cardio_train.parquet
 result_location: "results/"
 outlier_detection_technique: "combo"
-machine_learning_model: "linear_regression"
+machine_learning_model: 'linear_regression'
 automate_feature_selection: false
 use_one_predictor: true
 use_global_accuracy: true
@@ -14,26 +14,43 @@ approximate_sampled_rows: 1000000000
 sampling_seed: 17
 sample_max_attempts: 5
 num_processes: 22
-index_column_name: "Index"
+index_column_name: 'Index'
 memory_logging: false
-# max_unsupervised_depth: 1000
+max_unsupervised_depth: 1000
+#excluded_attributes:
+#  - "seg_humid"
+#  - "seg_shade"
+#  - "seg_tave_sroff"
 
 runtime_parameters:
-  choice_7:
-    predictor:
-      - "ap_hi"
-    clustering: unsupervised
-    cluster_alg: Minhal
-    machine_learning_model: "linear_regression"
-    accuracy: 1
-    split_size: 4
-    preprocess_data: false
-    postprocess_data: true
-    batch_size: "64MB"
-    batch_method: array_index
-    persist_structures: false
-    build_analysis: true
-    provide_error: true
+#    choice_6:
+#      predictor:
+#        - "seginc_gwflow"
+#      clustering: unsupervised
+#      cluster_alg: Minhal
+#      machine_learning_model: 'linear_regression'
+#      accuracy: 1
+#      split_size: 4
+#      preprocess_data: false
+#      postprocess_data: true
+#      batch_size: "256MB"
+#      batch_method: array_index
+    choice_7:
+      predictor:
+        - "ap_hi"
+      clustering: unsupervised
+      cluster_alg: Minhal
+      machine_learning_model: 'linear_regression'
+      accuracy: 1
+      split_size: 4
+      preprocess_data: false
+      postprocess_data: true
+      batch_size: "64MB"
+      batch_method: array_index
+      persist_structures: true
+      build_analysis: false
+      provide_error: false
+
 
 # Specifies the behavior for missing values
 handle_nulls:
@@ -73,15 +90,17 @@ handle_nulls:
   cardio:
     method: outliers
     replacement_value: -1
+  
 
 # Specifies which features are used to predictors for other features
-# If automate_feature_selection is set to true or use_single_predictor is set to true, this section will be ignored
+# Example is based off the slide 9 of ADBIS Presentation slides
+# If automate_feature_selection is set to true, this section will be ignored
 predicted_by:
   age:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -89,7 +108,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -97,7 +116,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -105,7 +124,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -113,7 +132,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -121,7 +140,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -129,7 +148,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -137,7 +156,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -145,7 +164,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -153,7 +172,7 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
@@ -161,7 +180,8 @@ predicted_by:
     predictors:
       - "weight"
     accuracy: 1
-    model: "linear_regression"
+    model: 'linear_regression'
     clustering: unsupervised
     cluster_alg: Minhal
     batch_method: array_index
+
